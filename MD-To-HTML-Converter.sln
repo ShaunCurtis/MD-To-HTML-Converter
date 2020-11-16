@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30621.155
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MD-To-HTML-Converter", "MD-To-HTML-Converter.csproj", "{039B024E-6A25-4F5A-9038-D12C045187AE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{039B024E-6A25-4F5A-9038-D12C045187AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{039B024E-6A25-4F5A-9038-D12C045187AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{039B024E-6A25-4F5A-9038-D12C045187AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{039B024E-6A25-4F5A-9038-D12C045187AE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1912956B-B22D-408B-BFBF-C97D580F18AD}
+	EndGlobalSection
+EndGlobal
