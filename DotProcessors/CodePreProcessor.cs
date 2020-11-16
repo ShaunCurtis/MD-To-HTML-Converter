@@ -6,28 +6,34 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    class CodePreProcessor : IDOTPreProcessor
+    class CodePreProcessor : DOTPreProcessor
     {
 
-        public string Name => "Code Block Pre-Processor";
+        public CodePreProcessor()
+        {
+        Name = "Code Block Pre-Processor";
 
-        public bool Process(DocumentObjectTree Dot)
+    }
+
+    public override bool Process(DocumentObjectTree Dot)
         {
             var ok = true;
             var isCode = false;
             foreach (var node in Dot.RootNode.Nodes)
             {
-                if (node.Value.DOTType == DOTNodeType.Raw)
+                if (node.Value.NodeType == DOTNodeType.Raw)
                 {
                     if (isCode)
                     {
                         node.Value.ProcessingType = DOTProcessingType.CodeBlock;
-                        node.Value.DOTType = DOTNodeType.Code;
+                        node.Value.BlockType = DOTBlockType.CodeBlock;
+                        node.Value.NodeType = DOTNodeType.Text;
                     }
                     if (node.Value.Text.StartsWith("```"))
                     {
                         node.Value.ProcessingType =  isCode ?  DOTProcessingType.EndCodeBlock: DOTProcessingType.StartCodeBlock ;
-                        node.Value.DOTType = DOTNodeType.Code;
+                        node.Value.BlockType = DOTBlockType.CodeBlock;
+                        node.Value.NodeType = DOTNodeType.Text;
                         isCode = !isCode;
                     }
                 }
@@ -39,10 +45,11 @@ namespace MD_To_HTML_Converter.DotProcessors
                 {
                     isCode = true;
                     masterNode = node.Value;
-                    masterNode.Name = "PRE";
+                    masterNode.BlockType = DOTBlockType.CodeBlock;
                     var lang = node.Value.Text.Replace("```", "");
                     if (!string.IsNullOrEmpty(lang)) node.Value.SetAttribute("lang", lang);
                     node.Value.Text = string.Empty;
+                    node.Value.NodeType = DOTNodeType.Node;
                 }
                 else if (node.Value.ProcessingType == DOTProcessingType.EndCodeBlock)
                 {
@@ -55,8 +62,7 @@ namespace MD_To_HTML_Converter.DotProcessors
                     node.Value.ProcessingType = DOTProcessingType.Remove;
                 }
             }
-            var list = Dot.RootNode.Nodes.Where(item => item.Value.ProcessingType == DOTProcessingType.Remove).ToList();
-            list.ForEach(item => Dot.RootNode.DeleteNode(item.Key));
+            CleanUp(Dot);
             return ok;
         }
     }

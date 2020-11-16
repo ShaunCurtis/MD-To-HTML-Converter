@@ -7,31 +7,35 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    class HeaderPreProcessor : IDOTPreProcessor
+    class HeaderPreProcessor : DOTPreProcessor, IDOTPreProcessor
     {
+        public HeaderPreProcessor()
+        {
+            this.Name = "Header Pre-Processor";
+    }
 
-        public string Name => "Header Pre-Processor";
-
-        public bool Process(DocumentObjectTree Dot)
+    public override bool Process(DocumentObjectTree Dot)
         {
             var ok = true;
             foreach (var node in Dot.RootNode.Nodes)
             {
-                if (node.Value.DOTType == DOTNodeType.Raw)
+                if (node.Value.NodeType == DOTNodeType.Raw)
                 {
                     var reg = new Regex(@"([#]+)\s(.+)");
                     if (reg.IsMatch(node.Value.Text)) {
                         MatchCollection matches = reg.Matches(node.Value.Text);
+                        node.Value.BlockType = DOTBlockType.HeadingBlock;
                         node.Value.ProcessingType = DOTProcessingType.HeadingListBlock;
                         if (matches[0].Groups.Count == 3)
                         {
-                            node.Value.Name = $"H{matches[0].Groups[1].Value.Length}";
+                            node.Value.SetAttribute("Level", matches[0].Groups[1].Value.Length);
                             node.Value.Text = matches[0].Groups[2].Value;
+                            node.Value.NodeType = DOTNodeType.Text;
                         }
                         else
                         {
                             node.Value.ProcessingType = DOTProcessingType.Remove;
-                            node.Value.DOTType = DOTNodeType.Node;
+                            node.Value.NodeType = DOTNodeType.Node;
                         }
 
                     }

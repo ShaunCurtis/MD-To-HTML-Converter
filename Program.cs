@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace MD_To_HTML_Converter
 {
@@ -12,7 +13,7 @@ namespace MD_To_HTML_Converter
 
         static  SortedList<int, IDOTPreProcessor> PreProcessors = new SortedList<int, IDOTPreProcessor>();
 
-        static List<IDOTProcessor> CodeProcessors = new List<IDOTProcessor>();
+        static SortedList<int, IDOTProcessor> Processors = new SortedList<int, IDOTProcessor>();
 
         static DocumentObjectTree Dot;
 
@@ -28,7 +29,7 @@ namespace MD_To_HTML_Converter
 
             string fileName = @"C:\Users\Shaun.Obsidian\source\repos\MD-To-HTML-Converter\index.md";
             Dot = new DocumentObjectTree() { FileName=fileName };
-            Dot.RootNode = new DOTNode() { DOTType = DOTNodeType.RootNode };
+            Dot.RootNode = new DOTNode() { NodeType = DOTNodeType.RootNode };
             
             PreProcessors.Add(0, new CodePreProcessor());
             PreProcessors.Add(10, new EmptyLinePreProcessor());
@@ -36,11 +37,21 @@ namespace MD_To_HTML_Converter
             PreProcessors.Add(30, new HeaderPreProcessor());
             PreProcessors.Add(40, new ParagraphPreProcessor());
 
+            Processors.Add(0, new ExpressionProcessor() { BlockType= DOTBlockType.BoldBlock, Expression=@"(.*)[\*]{2}(.*)[\*]{2}(.*)" });
+            Processors.Add(10, new ExpressionProcessor() { BlockType = DOTBlockType.ItalicsBlock, Expression = @"(.*)[\*]{1}(.*)[\*]{1}(.*)" });
+            Processors.Add(20, new ExpressionProcessor() { BlockType = DOTBlockType.VariableBlock, Expression = @"(.*)[\`]{1}(.+)[\`]{1}(.*)" });
+            var eproc = new ExpressionProcessor() { BlockType = DOTBlockType.LinkBlock, Expression = @"(.*)[^\!][\[]{1}(.+)[\]]{1}\s*[\(]{1}(.+)[\)]{1}(.*)" };
+            eproc.Attributes.Add(3, "href");
+            Processors.Add(30, eproc);
+            eproc = new ExpressionProcessor() { BlockType = DOTBlockType.ImageBlock, Expression = @"(.*)[\!][\[]{1}(.+)[\]]{1}\s*[\(]{1}(.+)[\)]{1}(.*)" };
+            eproc.Attributes.Add(3, "src");
+            Processors.Add(40, eproc);
+
             Console.WriteLine("Reading File");
             var lines = File.ReadAllLines(fileName);
             foreach (var line in lines)
             {
-                var dot = new DOTNode() { DOTType= DOTNodeType.Raw, Text = line, Name="READ-LINE" };
+                var dot = new DOTNode() { NodeType= DOTNodeType.Raw, Text = line};
                 Dot.RootNode.AddNode(dot);
             }
             Console.WriteLine("First Read Tree");
@@ -52,14 +63,16 @@ namespace MD_To_HTML_Converter
             }
             foreach (var node in Dot.RootNode.Nodes)
             {
-                foreach (var proc in CodeProcessors)
+                foreach (var proc in Processors)
                 {
-                    Console.WriteLine($"Running {proc.Name}");
-                    proc.Process(node.Value);
+                    Console.WriteLine($"Running {proc.Value.Name}");
+                    proc.Value.Process(Dot);
                 }
             }
             Console.WriteLine("Final Tree");
-            OutputTree();
+            Dot.ToConsole();
+            Console.WriteLine(Dot.AsHtml());
+            // OutputTree();
         }
 
         static void OutputTree()
@@ -70,12 +83,11 @@ namespace MD_To_HTML_Converter
 
         static void OutputNode(KeyValuePair<int, IDOTNode> dotnode, string id, string label)
         {
-            Console.WriteLine($"{id}> - {dotnode.Value.DOTType} - {dotnode.Value.Name} - {dotnode.Value.Text}");
+            Console.WriteLine($"{id}{label}> - {dotnode.Value.NodeType} - {dotnode.Value.BlockType} - {dotnode.Value.Text} - {dotnode.Value.GetAttributeString()}");
             foreach (var node in dotnode.Value.Nodes)
             {
                 var sid = $"{id}.{node.Key}"; 
-                //Console.WriteLine($"{sid}{label} - {node.Value.DOTType} - {node.Value.Name} - {node.Value.Text}");
-                OutputNode(node, sid, $"---{label}");
+                OutputNode(node, sid, $"--{label}");
             }
         }
     }

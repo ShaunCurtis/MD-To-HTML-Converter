@@ -8,7 +8,7 @@ namespace MD_To_HTML_Converter.DotProcessors
     public interface IDOTProcessor
     {
         public string Name { get; }
-
-        public bool Process(IDOTNode node);
+                
+        public bool Process(DocumentObjectTree Dot);
     }
 }

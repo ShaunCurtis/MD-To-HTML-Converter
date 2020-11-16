@@ -10,9 +10,18 @@ namespace MD_To_HTML_Converter.Data
         CodeBlock,
         OrderedListBlock,
         UnOrderedListBlock,
-        HeadingListBlock,
+        HeadingBlock,
+        ListItemBlock,
         QuoteBlock,
         TableBlock,
-        TaskBlock
+        TaskBlock,
+        TextBlock,
+        ParagraphBlock,
+        UnderlineBlock,
+        BoldBlock,
+        ItalicsBlock,
+        LinkBlock,
+        ImageBlock,
+        VariableBlock,
     }
 }

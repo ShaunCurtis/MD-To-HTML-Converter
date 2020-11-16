@@ -11,6 +11,5 @@ namespace MD_To_HTML_Converter.Data
         RootNode,
         Node,
         Text,
-        Code
     }
 }

@@ -7,20 +7,23 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    class ParagraphPreProcessor : IDOTPreProcessor
+    class ParagraphPreProcessor : DOTPreProcessor
     {
+        public ParagraphPreProcessor()
+        {
+            Name = "Paragraph Pre-Processor";
+        }
 
-        public string Name => "Paragraph Pre-Processor";
 
-        public bool Process(DocumentObjectTree Dot)
+        public override bool Process(DocumentObjectTree Dot)
         {
             var ok = true;
             foreach (var node in Dot.RootNode.Nodes)
             {
-                if (node.Value.DOTType == DOTNodeType.Raw)
+                if (node.Value.NodeType == DOTNodeType.Raw)
                 {
-                    node.Value.DOTType = DOTNodeType.Text;
-                    node.Value.Name = "P";
+                    node.Value.NodeType = DOTNodeType.Text;
+                    node.Value.BlockType = DOTBlockType.ParagraphBlock;
                 }
             }
             return ok;

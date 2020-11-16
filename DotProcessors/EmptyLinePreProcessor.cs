@@ -7,24 +7,24 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    class EmptyLinePreProcessor : IDOTPreProcessor
+    class EmptyLinePreProcessor : DOTPreProcessor
     {
 
-        public string Name => "Empty Line Pre-Processor";
 
-        public bool Process(DocumentObjectTree Dot)
+        public EmptyLinePreProcessor()
         {
-            var ok = true;
+            Name = "Empty Line Pre-Processor";
+        }
+
+        protected override void PreProcess(DocumentObjectTree Dot)
+        {
             foreach (var node in Dot.RootNode.Nodes)
             {
-                if (node.Value.DOTType == DOTNodeType.Raw)
+                if (node.Value.NodeType == DOTNodeType.Raw)
                 {
                     if (string.IsNullOrWhiteSpace(node.Value.Text)) node.Value.ProcessingType = DOTProcessingType.Remove;
                 }
             }
-            var list = Dot.RootNode.Nodes.Where(item => item.Value.ProcessingType == DOTProcessingType.Remove).ToList();
-            list.ForEach(item => Dot.RootNode.DeleteNode(item.Key));
-            return ok;
         }
     }
 }
