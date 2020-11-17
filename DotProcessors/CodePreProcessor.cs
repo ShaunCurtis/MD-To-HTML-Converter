@@ -26,7 +26,7 @@ namespace MD_To_HTML_Converter.DotProcessors
                     if (isCode)
                     {
                         node.Value.ProcessingType = DOTProcessingType.CodeBlock;
-                        node.Value.BlockType = DOTBlockType.CodeBlock;
+                        node.Value.BlockType = DOTBlockType.CodeLine;
                         node.Value.NodeType = DOTNodeType.Text;
                     }
                     if (node.Value.Text.StartsWith("```"))

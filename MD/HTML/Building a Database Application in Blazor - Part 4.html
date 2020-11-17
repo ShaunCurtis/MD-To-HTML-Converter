@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html>
+<link rel = "stylesheet" type = "text/css" href = "https://codeproject.freetls.fastly.net/App_Themes/CodeProject/Css/Main.css?dt=2.8.20201113.1" />
+<head>
+
+</head>
+<body>
+<h1>Building a Database Application in Blazor </h1>
+
+<h2>Part 4 - UI Components</h2>
+
+<h2>Introduction</h2>
+
+<p>This is the fourth article in the series looking at how to build and structure a real Database Application in Blazor. &nbsp;The articles so far are:</p>
+
+<ol start="1"><li><a href="https://www.codeproject.com/Articles/5279560/Building-a-Database-Application-in-Blazor-Part-1-P">Project Structure and Framework</a></li>
+
+<li><a href="https://www.codeproject.com/Articles/5279596/Building-a-Database-Application-in-Blazor-Part-2-S">Services - Building the CRUD Data Layers</a></li>
+
+<li><a href="https://www.codeproject.com/Articles/5279963/Building-a-Database-Application-in-Blazor-Part-3-C">View Components - CRUD Edit and View Operations in the UI</a></li>
+
+<li><a href="https://www.codeproject.com/Articles/5280090/Building-a-Database-Application-in-Blazor-Part-4-U">UI Components - Building HTML/CSS Controls</a></li>
+
+<li><a href="https://www.codeproject.com/Articles/5280391/Building-a-Database-Application-in-Blazor-Part-5-V">View Components - CRUD List Operations in the UI</a></li>
+
+<li><a href="https://www.codeproject.com/Articles/5281000/Building-a-Database-Application-in-Blazor-Part-6-A">A walk through detailing how to add weather stations and weather station data to the application</a></li>
+
+</ol>
+
+<p>This article looks at the components we use in the UI and then focuses on how to build generic UI Components from HTML and CSS.</p>
+
+<h2>Repository and Database</h2>
+
+<p><a href="https://github.com/ShaunCurtis/CEC.Blazor">CEC.Blazor GitHub Repository</a></p>
+
+<p>There's a SQL script in /SQL in the repository for building the database.</p>
+
+<p><a href="https://cec-blazor-server.azurewebsites.net/">You can see the Server version of the project running here</a>.</p>
+
+<p><a href="https://cec-blazor-wasm.azurewebsites.net/">You can see the WASM version of the project running here</a>.</p>
+
+<h3>Components</h3>
+
+<p>For a detailed look at components read my article <a href="https://www.codeproject.com/Articles/5277618/A-Dive-into-Blazor-Components">A Dive into Blazor Components</a>.</p>
+
+<p>Everything in the Blazor UI, other than the start page, is a component. &nbsp; Yes App, Router,...</p>
+
+<p>There are 4 categories of component in the application:</p>
+
+<ol start="1"><li>Views - these are get displayed on screen. &nbsp; Views are combined with a Layout to make the display window.</li>
+
+<li>Layouts - Layouts combine with Views to make up the display window.</li>
+
+<li>Forms - Forms are logical collections of controls. &nbsp; Edit forms, display forms, list forms, data entry wizards are all classic forms. &nbsp; Forms contain controls - not HTML.</li>
+
+<li>Controls - Controls display something - the emit HTML. &nbsp; Text boxes, dropdowns, buttons, grids are all classic controls.</li>
+
+</ol>
+
+<h3>Views</h3>
+
+<p>Views are specific to the application, but are common to WASM and Server, so live in <i>/Components/Views</i> of the application library.</p>
+
+<p>The Weather Forecast Viewer and List Views are shown below.</p>
+
+<pre lang="cs">// CEC.Weather/Components/Views/WeatherForecastViewerView.cs
+@using CEC.Blazor.Components
+@using CEC.Weather.Components
+@using CEC.Blazor.Components.Base
+
+@namespace CEC.Weather.Components.Views
+@implements IView
+@inherits Component
+
+&lt;WeatherForecastViewerForm ID="this.ID"&gt;&lt;/WeatherForecastViewerForm&gt;
+
+@code {
+
+    [CascadingParameter] public ViewManager ViewManager { get; set; }
+
+    [Parameter] public int ID { get; set; } = 0;
+}
+</pre>
+
+<p>The list view defines a UIOptions object that control various list control display options.</p>
+
+<pre lang="cs">// CEC.Blazor.Server/Routes/WeatherForecastListView.cs
+@using CEC.Blazor.Components
+@using CEC.Blazor.Components.UIControls
+@using CEC.Weather.Components
+@using CEC.Blazor.Components.Base
+
+@namespace CEC.Weather.Components.Views
+@inherits Component
+@implements IView
+
+&lt;WeatherForecastListForm UIOptions="this.UIOptions"&gt;&lt;/WeatherForecastListForm&gt;
+
+@code {
+    [CascadingParameter]
+    public ViewManager ViewManager { get; set; }
+
+    public UIOptions UIOptions =&gt; new UIOptions()
+    {
+        ListNavigationToViewer = true,
+        ShowButtons = true,
+        ShowAdd = true,
+        ShowEdit = true
+    };
+}
+</pre>
+
+<h3>Forms</h3>
+
+<p>Forms are specific to the application, but are common to WASM and Server, so live in <i>/Components/Views</i> of the application library.</p>
+
+<p>The code below shows the Weather Viewer. &nbsp; It's all UI Controls, no HTML markup.</p>
+
+<pre lang="html">// CEC.Weather/Components/Forms/WeatherForecastViewerForm.razor
+&lt;UICard&gt;
+    &lt;Header&gt;
+        @this.PageTitle
+    &lt;/Header&gt;
+    &lt;Body&gt;
+        &lt;UIErrorHandler IsError="this.IsError" IsLoading="this.IsDataLoading" ErrorMessage="@this.RecordErrorMessage"&gt;
+            &lt;UIContainer&gt;
+                &lt;UIRow&gt;
+                    &lt;UILabelColumn Columns="2"&gt;
+                        Date
+                    &lt;/UILabelColumn&gt;
+                    &lt;UIColumn Columns="2"&gt;
+                        &lt;FormControlPlainText Value="@this.Service.Record.Date.AsShortDate()"&gt;&lt;/FormControlPlainText&gt;
+                    &lt;/UIColumn&gt;
+                    &lt;UILabelColumn Columns="2"&gt;
+                        ID
+                    &lt;/UILabelColumn&gt;
+                    &lt;UIColumn Columns="2"&gt;
+                        &lt;FormControlPlainText Value="@this.Service.Record.ID.ToString()"&gt;&lt;/FormControlPlainText&gt;
+                    &lt;/UIColumn&gt;
+                    &lt;UILabelColumn Columns="2"&gt;
+                        Frost
+                    &lt;/UILabelColumn&gt;
+                    &lt;UIColumn Columns="2"&gt;
+                        &lt;FormControlPlainText Value="@this.Service.Record.Frost.AsYesNo()"&gt;&lt;/FormControlPlainText&gt;
+                    &lt;/UIColumn&gt;
+                &lt;/UIRow&gt;
+            ..........
+            &lt;/UIContainer&gt;
+        &lt;/UIErrorHandler&gt;
+        &lt;UIContainer&gt;
+            &lt;UIRow&gt;
+                &lt;UIColumn Columns="6"&gt;
+                    &lt;UIButton Show="this.IsLoaded" ColourCode="Bootstrap.ColourCode.dark" ClickEvent="(e =&gt; this.NextRecord(-1))"&gt;
+                        Previous
+                    &lt;/UIButton&gt;
+                    &lt;UIButton Show="this.IsLoaded" ColourCode="Bootstrap.ColourCode.dark" ClickEvent="(e =&gt; this.NextRecord(1))"&gt;
+                        Next
+                    &lt;/UIButton&gt;
+                &lt;/UIColumn&gt;
+                &lt;UIButtonColumn Columns="6"&gt;
+                    &lt;UIButton Show="!this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e =&gt; this.NavigateTo(PageExitType.ExitToList))"&gt;
+                        Exit To List
+                    &lt;/UIButton&gt;
+                    &lt;UIButton Show="!this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e =&gt; this.NavigateTo(PageExitType.ExitToLast))"&gt;
+                        Exit
+                    &lt;/UIButton&gt;
+                    &lt;UIButton Show="this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e =&gt; this.ModalExit())"&gt;
+                        Exit
+                    &lt;/UIButton&gt;
+                &lt;/UIButtonColumn&gt;
+            &lt;/UIRow&gt;
+        &lt;/UIContainer&gt;
+    &lt;/Body&gt;
+</pre>
+
+<p>The code behind page is relatively simple - the complexity is in the boilerplate code in parent classes. &nbsp; It loads the record specific Controller service.</p>
+
+<pre lang="cs">// CEC.Weather/Components/Forms/WeatherForecastViewerForm.razor.cs
+    public partial class WeatherForecastViewerForm : RecordFormBase&lt;DbWeatherForecast, WeatherForecastDbContext&gt;
+    {
+        [Inject]
+        private WeatherForecastControllerService ControllerService { get; set; }
+
+        public override string PageTitle =&gt; $"Weather Forecast Viewer {this.Service?.Record?.Date.AsShortDate() ?? string.Empty}".Trim();
+
+        protected override Task OnRenderAsync(bool firstRender)
+        {
+            if (firstRender) this.Service = this.ControllerService;
+            return base.OnRenderAsync(firstRender);
+        }
+    }
+</pre>
+
+<h2>UI Controls</h2>
+
+<p>UI Controls emit HTML and CSS markup based on Bootstrap as the UI CSS Framework. &nbsp; All controls inherit from <code>ControlBase</code> and UI Controls inherit from <code>UIBase</code>.</p>
+
+<h5>UIBase</h5>
+
+<p><code>UIBase</code> inherits from <code>ControlBase</code> which inherits from <code>Component</code>. &nbsp; It builds an HTML DIV block that you can turn on or off.</p>
+
+<p>Lets look at some of the bits of <code>UIBase</code> in detail.</p>
+
+<p>The HTML block tag can be set using the <code>Tag</code> parameter. &nbsp; However, the component doesn't use this property directly to build the HTML. &nbsp; It uses a second protected property <code>_Tag</code>. &nbsp; In the base implementation this returns <code>Tag</code>.</p>
+
+<pre lang="cs">/// Css for component - can be overridden and fixed in inherited components
+[Parameter]
+public virtual string Tag { get; set; } = "div";
+
+protected virtual string _Tag =&gt; this.Tag;
+</pre>
+
+<p>  <code>_Tag</code> is declared virtual so in derived classes you can override it and set the tag. &nbsp; So in in <code>UIAnchor</code> class you would set it and thus override anything set in <code>Tag</code>.</p>
+
+<pre lang="cs">protected overridden string _Tag =&gt; "a";
+</pre>
+
+<p>Css works in a similar way.</p>
+
+<pre lang="cs">/// Css for component - can be overridden and fixed in inherited components
+[Parameter]
+public virtual string Css { get; set; } = string.Empty;
+
+/// Additional Css to tag on the end of the base Css
+[Parameter]
+public string AddOnCss { get; set; } = string.Empty;
+
+/// Property for fixing the base Css. &nbsp; Base returns the Parameter Css, but can be overridden in inherited classes
+protected virtual string _BaseCss =&gt; this.Css;
+
+/// Property for fixing the Add On Css. &nbsp; Base returns the Parameter AddOnCss, but can be overridden say to String.Empty in inherited classes
+protected virtual string _AddOnCss =&gt; this.AddOnCss;
+
+/// Actual calculated Css string used in the component
+protected virtual string _Css =&gt; this.CleanUpCss($"{this._BaseCss} {this._AddOnCss}");
+
+/// Method to clean up the Css - remove leading and trailing spaces and any multiple spaces
+protected string CleanUpCss(string css)
+{
+    while (css.Contains("  ")) css = css.Replace("  ", " ");
+    return css.Trim();
+}
+
+</pre>
+
+<p>So to fix the base Css.</p>
+
+<pre lang="cs">protected overridden string _BaseCss =&gt; "button";
+</pre>
+
+<p>Razor markup declared attributes are captured in <code>AdditionalAttributes</code>. &nbsp; <code>UsedAttributes</code> is a list of those not to add to the component. &nbsp; <code>ClearDuplicateAttributes()</code> removes the UsedAttributes.</p>
+
+<pre lang="cs">/// Gets or sets a collection of additional attributes that will be applied to the created &lt;c&gt;form&lt;/c&gt; element.
+[Parameter(CaptureUnmatchedValues = true)] public IDictionary&lt;string, object&gt; AdditionalAttributes { get; set; }
+
+/// Html attributes that need to be removed if set on the control default is only the class attribute
+protected List&lt;string&gt; UsedAttributes { get; set; } = new List&lt;string&gt;() { "class" };
+
+/// Method to clean up the Additional Attributes
+protected void ClearDuplicateAttributes()
+{
+    if (this.AdditionalAttributes != null && this.UsedAttributes != null)
+    {
+        foreach (var item in this.UsedAttributes)
+        {
+            if (this.AdditionalAttributes.ContainsKey(item)) this.AdditionalAttributes.Remove(item);
+        }
+    }
+}
+</pre>
+
+<p>Finally <code>BuildRenderTree</code> builds out the HTML for the component. &nbsp; In this case we are doing this in code and not using a Razor markup file. &nbsp;It:</p>
+
+<ol start="1"><li>Checks if it should be displayed.</li>
+
+<li>Clears the unwanted attributes from <code>AdditionalAttributes</code>.</li>
+
+<li>Creates the element with the correct tag.</li>
+
+<li>Adds the <code>AdditionalAttributes</code>.</li>
+
+<li>Adds the CSS.</li>
+
+<li>Adds the Child Content </li>
+
+</ol>
+
+<pre lang="cs">protected override void BuildRenderTree(RenderTreeBuilder builder)
+{
+    if (this._Show)
+    {
+        this.ClearDuplicateAttributes();
+        builder.OpenElement(0, this._Tag);
+        builder.AddMultipleAttributes(1, AdditionalAttributes);
+        builder.AddAttribute(2, "class", this._Css);
+        if (!string.IsNullOrEmpty(this._Content)) builder.AddContent(3, (MarkupString)this._Content);
+        else if (this.ChildContent != null) builder.AddContent(4, ChildContent);
+        builder.CloseElement();
+    }
+}
+</pre>
+
+<h5>UIBootstrapBase</h5>
+
+<p><code>UIBootstrapBase</code> adds extra functionality for Bootstrap components. &nbsp;Formatting options such a component colour and sizing are represented as Enums, and Css fragments built based on the selected Enum.</p>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UIBootstrapBase.cs
+public class UIBootstrapBase : UIBase
+{
+    protected virtual string CssName { get; set; } = string.Empty;
+
+    /// Bootstrap Colour for the Component
+    [Parameter]
+    public Bootstrap.ColourCode ColourCode { get; set; } = Bootstrap.ColourCode.info;
+
+    /// Bootstrap Size for the Component
+    [Parameter]
+    public Bootstrap.SizeCode SizeCode { get; set; } = Bootstrap.SizeCode.normal;
+
+    /// Property to set the HTML value if appropriate
+    [Parameter]
+    public string Value { get; set; } = "";
+
+    /// Property to get the Colour CSS
+    protected virtual string ColourCssFragment =&gt; GetCssFragment&lt;Bootstrap.ColourCode&gt;(this.ColourCode);
+
+    /// Property to get the Size CSS
+    protected virtual string SizeCssFragment =&gt; GetCssFragment&lt;Bootstrap.SizeCode&gt;(this.SizeCode);
+
+    /// CSS override
+    protected override string _Css =&gt; this.CleanUpCss($"{this.CssName} {this.SizeCssFragment} {this.ColourCssFragment} {this.AddOnCss}");
+
+    /// Method to format as Bootstrap CSS Fragment
+    protected string GetCssFragment&lt;T&gt;(T code) =&gt; $"{this.CssName}-{Enum.GetName(typeof(T), code).Replace("_", "-")}";
+}
+</pre>
+
+<h3>Some Examples</h3>
+
+<p>The rest of the article looks at a few of the UI controls in more detail.</p>
+
+<h5>UIButton</h5>
+
+<p>This is a standard Bootstrap Button. &nbsp;</p>
+
+<ol start="1"><li><code>ButtonType</code> and <code>ClickEvent</code> are specific to buttons.</li>
+
+<li><code>CssName</code> and <code>_Tag</code> are hardwired.</li>
+
+<li><code>ButtonClick</code> handles the button click event.</li>
+
+<li><code>BuildRenderTree</code> builds the markup and wires the JSInterop <code>onclick</code> event.</li>
+
+<li><code>Show</code> controls whether the button gets rendered.</li>
+
+</ol>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UIButton.cs
+public class UIButton : UIBootstrapBase
+{
+    /// Property setting the button HTML attribute Type
+    [Parameter]
+    public string ButtonType { get; set; } = "button";
+
+    /// Override the CssName
+    protected override string CssName =&gt; "btn";
+
+    /// Override the Tag
+    protected override string _Tag =&gt; "button";
+
+    /// Callback for a button click event
+    [Parameter]
+    public EventCallback&lt;MouseEventArgs&gt; ClickEvent { get; set; }
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        if (this.Show)
+        {
+            builder.OpenElement(0, this._Tag);
+            builder.AddAttribute(1, "type", this.ButtonType);
+            builder.AddAttribute(2, "class", this._Css);
+            builder.AddAttribute(3, "onclick", EventCallback.Factory.Create&lt;MouseEventArgs&gt;(this, this.ButtonClick));
+            builder.AddContent(4, ChildContent);
+            builder.CloseElement();
+        }
+    }
+
+    /// Event handler for button click
+    protected void ButtonClick(MouseEventArgs e) =&gt; this.ClickEvent.InvokeAsync(e);
+}
+</pre>
+
+<p>Here's some code showing the control in use.</p>
+
+<pre lang="html">// CEC.Weather/Components/Forms/WeatherViewer.razor
+&lt;UIButtonColumn Columns="6"&gt;
+    &lt;UIButton Show="!this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e =&gt; this.NavigateTo(PageExitType.ExitToList))"&gt;
+        Exit To List
+    &lt;/UIButton&gt;
+    &lt;UIButton Show="!this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e =&gt; this.NavigateTo(PageExitType.ExitToLast))"&gt;
+        Exit
+    &lt;/UIButton&gt;
+    &lt;UIButton Show="this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e =&gt; this.ModalExit())"&gt;
+        Exit
+    &lt;/UIButton&gt;
+&lt;/UIButtonColumn&gt;
+</pre>
+
+<h5>UIAlert</h5>
+
+<p>This is a standard Bootstrap Alert. &nbsp;</p>
+
+<ol start="1"><li><code>Alert</code> is a class to encapsulate an Alert.</li>
+
+<li><code>ColourCssFragement</code>, <code>Show</code> and <code>_Content</code> are wired into the Alert object instance.</li>
+
+</ol>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UI/UIAlert.cs
+public class UIAlert : UIBootstrapBase
+{
+    /// Alert to display
+    [Parameter]
+    public Alert Alert { get; set; } = new Alert();
+
+    /// Set the CssName
+    protected override string CssName =&gt; "alert";
+
+    /// Property to override the colour CSS
+    protected override string ColourCssFragment =&gt; this.Alert != null ? GetCssFragment&lt;Bootstrap.ColourCode&gt;(this.Alert.ColourCode) : GetCssFragment&lt;Bootstrap.ColourCode&gt;(this.ColourCode);
+
+    /// Boolean Show override
+    protected override bool _Show =&gt; this.Alert?.IsAlert ?? false;
+
+    /// Override the content with the alert message
+    protected override string _Content =&gt; this.Alert?.Message ?? string.Empty;
+}
+</pre>
+
+<p>Here's some code showing the control in use.</p>
+
+<pre lang="html">// CEC.Weather/Components/Forms/WeatherEditor.razor
+&lt;UIContainer&gt;
+    &lt;UIRow&gt;
+        &lt;UIColumn Columns="7"&gt;
+            &lt;UIAlert Alert="this.AlertMessage" SizeCode="Bootstrap.SizeCode.sm"&gt;&lt;/UIAlert&gt;
+        &lt;/UIColumn&gt;
+        &lt;UIButtonColumn Columns="5"&gt;
+             .........
+        &lt;/UIButtonColumn&gt;
+    &lt;/UIRow&gt;
+&lt;/UIContainer&gt;
+</pre>
+
+<h5>UIErrorHandler</h5>
+
+<p>This is a wrapper control designed to save implementing error checking in child content. &nbsp;It has three states controlled by <code>IsError</code> and <code>IsLoading</code>:</p>
+
+<ol start="1"><li>Loading - when it displays the loading message and the spinner.</li>
+
+<li>Error - when it displays an error message.</li>
+
+<li>Loaded - when it displays the Child Content.</li>
+
+</ol>
+
+<p>Any controls within the child content only get added to the RenderTree when loading is complete and <code>IsError</code> is false. &nbsp; </p>
+
+<p>The control  saves implementing a lot of error checking in the child content.</p>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UI/UIErrorHandler.cs
+public class UIErrorHandler : UIBase
+{
+    /// Enum for the Control State
+    public enum ControlState { Error = 0, Loading = 1, Loaded = 2}
+
+    /// Boolean Property that determines if the child content or an error message is diplayed
+    [Parameter]
+    public bool IsError { get; set; } = false;
+
+    /// Boolean Property that determines if the child content or an loading message is diplayed
+    [Parameter]
+    public bool IsLoading { get; set; } = true;
+
+    /// Control State
+    public ControlState State
+    {
+        get
+        {
+            if (IsError && !IsLoading) return ControlState.Error;
+            else if (!IsLoading) return ControlState.Loaded;
+            else return ControlState.Loading;
+        }
+    }
+
+    /// CSS Override
+    protected override string _BaseCss =&gt; this.IsLoading? "text-center p-3": "label label-error m-2";
+
+    /// Customer error message to display
+    [Parameter]
+    public string ErrorMessage { get; set; } = "An error has occured loading the content";
+
+        
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        this.ClearDuplicateAttributes();
+        switch (this.State)
+        {
+            case ControlState.Loading:
+                builder.OpenElement(1, "div");
+                builder.AddAttribute(2, "class", this._Css);
+                builder.OpenElement(3, "button");
+                builder.AddAttribute(4, "class", "btn btn-primary");
+                builder.AddAttribute(5, "type", "button");
+                builder.AddAttribute(6, "disabled", "disabled");
+                builder.OpenElement(7, "span");
+                builder.AddAttribute(8, "class", "spinner-border spinner-border-sm pr-2");
+                builder.AddAttribute(9, "role", "status");
+                builder.AddAttribute(10, "aria-hidden", "true");
+                builder.CloseElement();
+                builder.AddContent(11, "  Loading...");
+                builder.CloseElement();
+                builder.CloseElement();
+                break;
+            case ControlState.Error:
+                builder.OpenElement(1, "div");
+                builder.OpenElement(2, "span");
+                builder.AddAttribute(3, "class", this._Css);
+                builder.AddContent(4, ErrorMessage);
+                builder.CloseElement();
+                builder.CloseElement();
+                break;
+            default:
+                builder.AddContent(1, ChildContent);
+                break;
+        };
+    }
+}
+</pre>
+
+<p>Here's some code showing the control in use.</p>
+
+<pre lang="html">// CEC.Weather/Components/Forms/WeatherViewer.razor
+&lt;UICard&gt;
+    &lt;Header&gt;
+        @this.PageTitle
+    &lt;/Header&gt;
+    &lt;Body&gt;
+        &lt;UIErrorHandler IsError="this.IsError" IsLoading="this.IsDataLoading" ErrorMessage="@this.RecordErrorMessage"&gt;
+            &lt;UIContainer&gt;
+            ..........
+            &lt;/UIContainer&gt;
+        &lt;/UIErrorHandler&gt;
+        .......
+    &lt;/Body&gt;
+</pre>
+
+<h5>UIContainer/UIRow/UIColumn</h5>
+
+<p>These controls create the BootStrap grid system - i.e. &nbsp;container, row and column - by building out DIVs with the correct Css.</p>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UIBootstrapContainer/UIContainer.cs
+    public class UIContainer : UIBase
+    {
+        // Overrides the _BaseCss property to force the css_
+        protected override string _BaseCss =&gt; "container-fluid";
+    }
+</pre>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UIBootstrapContainer/UIRow.cs
+    public class UIRow : UIBase
+    {
+        protected override string _BaseCss =&gt; "row";
+    }
+</pre>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UIBootstrapContainer/UIColumn.cs
+public class UIColumn : UIBase
+{
+    [Parameter]
+    public int Columns { get; set; } = 1;
+
+    protected override string _BaseCss =&gt; $"col-{Columns}";
+}
+</pre>
+
+<pre lang="cs">// CEC.Blazor/Components/UIControls/UIBootstrapContainer/UILabelColumn.cs
+public class UILabelColumn : UIColumn
+{
+    protected override string _BaseCss =&gt; $"col-{Columns} col-form-label";
+}
+</pre>
+
+<p>Here's some code showing the controls in use.</p>
+
+<pre lang="html">// CEC.Weather/Components/Forms/WeatherViewer.razor
+&lt;UIContainer&gt;
+    &lt;UIRow&gt;
+        &lt;UILabelColumn Columns="2"&gt;
+            Date
+        &lt;/UILabelColumn&gt;
+        ............
+    &lt;/UIRow&gt;
+..........
+&lt;/UIContainer&gt;
+</pre>
+
+<h3>Wrap Up</h3>
+
+<p>This article provides an overview on how to build UI Controls with components, and examines some example components in more detail. &nbsp; You can see all the library UIControls in the GitHub Repository - <a href="https://github.com/ShaunCurtis/CEC.Blazor/tree/master/CEC.Blazor/Components/UIControls">CEC.Blazor/Components/UIControls</a></p>
+
+<p>Some key points to note:</p>
+
+<ol start="1"><li>UI Controls let you abstract markup from higher level components such as Forms and Views.</li>
+
+<li>UI Controls give you control and allies some discipline over the HTML and CSS markup.</li>
+
+<li>Your main View and Form components are much cleaner and easier to view.</li>
+
+<li>You can use as little or as much abstraction as you wish.</li>
+
+<li>Controls, such as <code>UIErrorHandler</code>, make life easier!</li>
+
+</ol>
+
+<h2>History</h2>
+
+<ul><li>21-Sep-2020: Initial version.</li>
+
+</ul>
+
+<ul><li>17-Nov-2020: Major Blazor.CEC library changes. &nbsp; Change to ViewManager from Router and new Component base implementation.</li>
+
+</ul>
+
+
+</body>
+</html>

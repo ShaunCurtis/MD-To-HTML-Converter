@@ -47,7 +47,6 @@ namespace MD_To_HTML_Converter.DotProcessors
                     {
                         node.Text = string.Empty;
                         node.NodeType = DOTNodeType.Node;
-                        node.Text = string.Empty;
                          node.AddNode(new DOTNode() { BlockType = DOTBlockType.TextBlock, NodeType = DOTNodeType.Text, Text = match.Groups[1].Value });
                         var newnode = (IDOTNode)new DOTNode() { BlockType = this.BlockType, NodeType = DOTNodeType.Text, Text = match.Groups[2].Value };
                         foreach (var attr in this.Attributes)

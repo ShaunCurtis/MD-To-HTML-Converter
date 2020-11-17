@@ -8,6 +8,7 @@ namespace MD_To_HTML_Converter.Data
     {
         None,
         CodeBlock,
+        CodeLine,
         OrderedListBlock,
         UnOrderedListBlock,
         HeadingBlock,

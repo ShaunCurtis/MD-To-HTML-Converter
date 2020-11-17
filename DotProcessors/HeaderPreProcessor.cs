@@ -28,7 +28,7 @@ namespace MD_To_HTML_Converter.DotProcessors
                         node.Value.ProcessingType = DOTProcessingType.HeadingListBlock;
                         if (matches[0].Groups.Count == 3)
                         {
-                            node.Value.SetAttribute("Level", matches[0].Groups[1].Value.Length);
+                            node.Value.SetValue("Level", matches[0].Groups[1].Value.Length);
                             node.Value.Text = matches[0].Groups[2].Value;
                             node.Value.NodeType = DOTNodeType.Text;
                         }

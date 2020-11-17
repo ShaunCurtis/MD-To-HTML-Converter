@@ -16,13 +16,16 @@ namespace MD_To_HTML_Converter.Data
 
         public SortedList<int, IDOTNode> Nodes { get; set; } = new SortedList<int, IDOTNode>();
 
+        public Dictionary<string, object> Values { get; set; } = new Dictionary<string, object>();
+
         public string Text { get; set; } = string.Empty;
 
         public object Clone()
         {
-            var newNode = new DOTNode() { NodeType = this.NodeType, Text= this.Text };
+            var newNode = new DOTNode() { NodeType = this.NodeType, Text= this.Text, BlockType = this.BlockType };
             foreach (var att in this.Attributes) newNode.Attributes.Add(att.Key, att.Value);
-            newNode.BlockType = DOTBlockType.TextBlock;
+            foreach (var val in this.Values) newNode.Values.Add(val.Key, val.Value);
+            newNode.BlockType = newNode.BlockType == DOTBlockType.None ? DOTBlockType.TextBlock: newNode.BlockType;
             var index = 0;
             foreach (var node in this.Nodes)
             {

@@ -14,28 +14,13 @@ namespace MD_To_HTML_Converter.Data
 
         public DOTProcessingType ProcessingType { get; set; }
 
+        public Dictionary<string, object> Values { get; set; }
+
         public Dictionary<string, object> Attributes { get; set; }
 
         public SortedList<int, IDOTNode> Nodes { get; set; }
 
         public string Text { get; set; }
-
-        public string Tag => this.BlockType switch
-        {
-            DOTBlockType.BoldBlock => "strong",
-            DOTBlockType.HeadingBlock => "h",
-            DOTBlockType.ImageBlock => "img",
-            DOTBlockType.ItalicsBlock => "i",
-            DOTBlockType.ListItemBlock => "li",
-            DOTBlockType.OrderedListBlock => "ol",
-            DOTBlockType.ParagraphBlock => "p",
-            DOTBlockType.QuoteBlock => "blockquote",
-            DOTBlockType.TextBlock => "span",
-            DOTBlockType.UnderlineBlock => "u",
-            DOTBlockType.UnOrderedListBlock => "ul",
-            DOTBlockType.VariableBlock => "code",
-            _ => "span"
-        };
 
         public bool GetAttribute(string key, out object value)
         {
@@ -67,6 +52,37 @@ namespace MD_To_HTML_Converter.Data
             if (this.Attributes.ContainsKey(key)) this.Attributes[key] = value;
             else this.Attributes.Add(key, value);
         }
+        public bool GetValue(string key, out object value)
+        {
+            value = null;
+            if (this.Values.ContainsKey(key)) value = this.Values[key];
+            return this.Values.ContainsKey(key);
+        }
+
+        public object GetValue(string key)
+        {
+            if (this.Values.ContainsKey(key)) return this.Values[key];
+            else return null;
+        }
+
+        public bool GetValueAsString(string key, out string value)
+        {
+            value = string.Empty;
+            var val = GetValue(key);
+            if (val is string)
+            {
+                value = (string)this.Values[key];
+                return true;
+            }
+            return false;
+        }
+
+        public void SetValue(string key, object value)
+        {
+            if (this.Values.ContainsKey(key)) this.Values[key] = value;
+            else this.Values.Add(key, value);
+        }
+
 
         public bool GetNode(int key, out object value)
         {
@@ -105,45 +121,6 @@ namespace MD_To_HTML_Converter.Data
             this.Nodes = list;
         }
 
-        public string AsHtml()
-        {
-            switch (this.BlockType)
-            {
-                case DOTBlockType.HeadingBlock:
-                        return HeaderHtml();
-                default:
-                    {
-                        return _AsHtml();
-                    }
-            }
-        }
-
-        private string _AsHtml()
-        {
-            switch (this.BlockType)
-            {
-                case DOTBlockType.HeadingBlock:
-                    return HeaderHtml();
-                default:
-                    {
-                        break;
-                    }
-            }
-            var html = new StringBuilder();
-            html.AppendLine($"<{this.Tag} {this.GetAttributeString()}>".Trim());
-            if (!string.IsNullOrEmpty(this.Text)) html.AppendLine(this.Text);
-            if (this.Nodes.Count > 0)
-            {
-                foreach (var node in this.Nodes)
-                {
-                    html.AppendLine(node.Value.AsHtml());
-                }
-            }
-            html.AppendLine($"</{this.Tag}>");
-
-            return html.ToString();
-        }
-
         public void ToConsole(string id, string label)
         {
             Console.WriteLine($"{label}{id}> - {this.NodeType} - {this.BlockType} - {this.Text} - {this.GetAttributeString()}");
@@ -152,23 +129,6 @@ namespace MD_To_HTML_Converter.Data
                 var sid = $"{id}.{node.Key}";
                 node.Value.ToConsole(sid, $"=={label}");
             }
-        }
-
-        public string HeaderHtml()
-        {
-            var html = new StringBuilder();
-            html.AppendLine($"<{this.Tag}{this.GetAttribute("Level")}>".Trim());
-            if (!string.IsNullOrEmpty(this.Text)) html.AppendLine(this.Text);
-            if (this.Nodes.Count > 0)
-            {
-                foreach (var node in this.Nodes)
-                {
-                    html.AppendLine(node.Value.AsHtml());
-                }
-            }
-            html.AppendLine($"</{this.Tag}>");
-
-            return html.ToString();
         }
 
         public string GetAttributeString()
