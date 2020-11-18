@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    class ExpressionProcessor : IDOTProcessor
+    class ExpressionLineProcessor : ILineProcessor
     {
         public string Name => $"{this.BlockType} Processor";
 

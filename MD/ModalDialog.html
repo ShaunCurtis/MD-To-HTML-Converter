@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<link rel = "stylesheet" type = "text/css" href = "https://codeproject.freetls.fastly.net/App_Themes/CodeProject/Css/Main.css?dt=2.8.20201113.1" />
+<head>
+
+</head>
+<body>
+<h1>A Simple Bootstrap Modal Dialog for Blazor</h1>
+
+<h2>Overview</h2>
+
+<p>If you want a web based SPA [Single Page Application] to look like a real application you need modal dialogs. &nbsp; This article shows how to build a modal dialog wrapper for Blazor IComponents using the Bootstrap Modal Dialog CSS Framework.</p>
+
+<h2>Code and Examples</h2>
+
+<p>There's no specific project code for this article. &nbsp;The component is part of <code>CEC.Blazor</code> Library avaliable on Github at <a href="https://github.com/ShaunCurtis/CEC.Blazor">CEC.Blazor</a>. &nbsp; You can get the source from here, and see a live example in action. &nbsp;To review the code , start at <i>CEC.Blazor.Server/Routes/WeatherForecast/WeatherForecastListModalView</i>.</p>
+
+<h2>The Modal Dialog Classes</h2>
+
+<p>The Modal Dialog control is a Blazor Component.</p>
+
+<p>There are three classes and one Enum:</p>
+
+<ol start="1"><li>BootStrapModal</li>
+
+<li>BootStrapModalOptions</li>
+
+<li>BootStrapModalResult</li>
+
+<li>BootStrapModalResultType</li>
+
+</ol>
+
+<h4>BootStrapModalResultType</h4>
+
+<pre lang="c#">// Defines the types for exiting the dialog
+public enum BootstrapModalResultType
+{
+    NoSet,
+    OK,
+    Cancel,
+    Exit
+}
+</pre>
+
+<h4>BootStrapModalResult</h4>
+
+<p><code>BootstrapModalResult</code> is passed back by <code>BootStrapModal</code> when the modal closes.</p>
+
+<pre lang="c#">public class BootstrapModalResult
+{
+    // The closing type
+    public BootstrapModalResultType ResultType { get; private set; } = BootstrapModalResultType.NoSet;
+
+    // Whatever object you wish to pass back
+    public object Data { get; set; } = null;
+
+    // A set of static methods to build a BootstrapModalResult
+
+    public static BootstrapModalResult OK() =&gt; new BootstrapModalResult() {ResultType = BootstrapModalResultType.OK };
+
+    public static BootstrapModalResult Exit() =&gt; new BootstrapModalResult() {ResultType = BootstrapModalResultType.Exit};
+
+    public static BootstrapModalResult Cancel() =&gt; new BootstrapModalResult() {ResultType = BootstrapModalResultType.Cancel };
+
+    public static BootstrapModalResult OK(object data) =&gt; new BootstrapModalResult() { Data = data, ResultType = BootstrapModalResultType.OK };
+
+    public static BootstrapModalResult Exit(object data) =&gt; new BootstrapModalResult() { Data = data, ResultType = BootstrapModalResultType.Exit };
+
+    public static BootstrapModalResult Cancel(object data) =&gt; new BootstrapModalResult() { Data = data, ResultType = BootstrapModalResultType.Cancel };
+}
+</pre>
+
+<h4>BootStrapModalOptions</h4>
+
+<p><code>BootstrapModalOptions</code> is an options class passed to the Modal Dialog class when opening the Dialog. &nbsp; The properties are pretty self explanatory. &nbsp; </p>
+
+<pre lang="c#">public class BootstrapModalOptions
+{
+    public string Title { get; set; } = "Modal Dialog";
+
+    public string ContainerCSS { get; set; }
+
+    public string ModalCSS { get; set; }
+
+    public string ModalHeaderCSS { get; set; }
+
+    public string ModalBodyCSS { get; set; }
+
+    public bool ShowCloseButton { get; set; }
+
+    public bool HideHeader { get; set; }
+
+    // Generic name/object list to pass any object to the dialog
+    public Dictionary&lt;string, object&gt; Parameters { get; set; } = new Dictionary&lt;string, object&gt;();
+}
+</pre>
+
+<h4>BootStrapModal</h4>
+
+<p>The Razor Markup for <code>BootstrapModal</code> replicates the Bootstrap markup. &nbsp; We don't need to worry about toggling the container <code>display</code> mode as we don't generate any markup if <code>ShowDialog</code> is false. &nbsp; We cascade the ModalDialog so that the child form has direct access to it. &nbsp;</p>
+
+<pre lang="c#">@inherits ComponentBase
+
+@namespace CEC.Blazor.Components.UIControls
+
+@if (this._ShowModal)
+{
+    &lt;CascadingValue Value="this"&gt;
+        &lt;div class="@this._ContainerCss" data-backdrop="static" tabindex="-1" role="dialog" aria-modal="true" style="display:block;"&gt;
+            &lt;div class="@this._ModalCss"&gt;
+                &lt;div class="modal-content"&gt;
+                    @if (!this.Options.HideHeader)
+                    {
+                        &lt;div class="@this._ModalHeaderCss"&gt;
+                            &lt;h5 class="modal-title"&gt;@this.Options.Title&lt;/h5&gt;
+                            @if (this.Options.ShowCloseButton)
+                            {
+                                &lt;button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="this.Dismiss"&gt;
+                                    &lt;span aria-hidden="true"&gt;&times;&lt;/span&gt;
+                                &lt;/button&gt;
+                            }
+                        &lt;/div&gt;
+                    }
+                    &lt;div class="@this._ModalBodyCss"&gt;
+                        @this._Content
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/CascadingValue&gt;
+}
+</pre>
+
+<p>Some key points:</p>
+
+<ol start="1"><li>The component is initialised when the View is created and added to the RenderTree.</li>
+
+<li>There's no need for multiple copies of the component on a page. &nbsp; Call `Show`, supplying the component type to display it.</li>
+
+<li>The component hides itself. &nbsp; Either the "child" calls the `BootstrapModal` function `Close` or `BootstrapModal` itself calls  `Dismiss`.</li>
+
+<li>The component uses a `TaskCompletionSource` object to manage the async behaviour of the component and communicate task status back to the caller.</li>
+
+</ol>
+
+<pre lang="c#">public partial class BootstrapModal : ComponentBase
+{
+    public BootstrapModalOptions Options { get; set; } = new BootstrapModalOptions();
+
+    private RenderFragment _Content { get; set; }
+
+    private bool _ShowModal { get; set; }
+
+    private Task modalResult { get; set; }
+
+    private string _ContainerCss =&gt; $"modal fade show {this.Options.ContainerCSS}".Trim();
+
+    private string _ModalCss =&gt; $"modal-dialog {this.Options.ModalCSS}";
+
+    private string _ModalHeaderCss =&gt; $"modal-header {this.Options.ModalHeaderCSS}".Trim();
+
+    private string _ModalBodyCss =&gt; $"modal-body {this.Options.ModalBodyCSS}".Trim();
+
+    // object we use to communicate back to the caller on the task state
+    private TaskCompletionSource&lt;BootstrapModalResult&gt; _modalcompletiontask { get; set; } = new TaskCompletionSource&lt;BootstrapModalResult&gt;();
+
+    //  Method used to Show/Hide the Dialog
+    // Note that TModal must implement IComponent
+    public Task&lt;BootstrapModalResult&gt; Show&lt;TModal&gt;(BootstrapModalOptions options) where TModal: IComponent 
+    {
+        this.Options = options;
+        this._modalcompletiontask = new TaskCompletionSource&lt;BootstrapModalResult&gt;();
+        var i = 0;
+        this._Content = new RenderFragment(builder =&gt;
+        {
+            builder.OpenComponent(i++, typeof(TModal));
+            builder.CloseComponent();
+        });
+        this._ShowModal = true;
+        InvokeAsync(StateHasChanged);
+        return _modalcompletiontask.Task;
+    }
+
+    // Method to update the dialog display options
+    public void Update(BootstrapModalOptions options = null)
+    {
+        this.Options = options??= this.Options;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // method called by the dismiss button in the dialog header to close the dialog
+    public async void Dismiss()
+    {
+        _ = _modalcompletiontask.TrySetResult(BootstrapModalResult.Cancel());
+        this._ShowModal = false;
+        this._Content = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Method called by the child form to close the dialog
+    public async void Close(BootstrapModalResult result)
+    {
+        _ = _modalcompletiontask.TrySetResult(result);
+        this._ShowModal = false;
+        this._Content = null;
+        await InvokeAsync(StateHasChanged);
+    }
+}
+</pre>
+
+<h2>Implementing Bootstrap Modal</h2>
+
+<h3>The YesNoModal</h3>
+
+<p>The <code>YesNoModal</code> is a simple "Are You Sure" modal form. &nbsp; It captures the cascaded parent object reference as <code>Parent</code> and calls the <code>Parent.Close()</code> to hide the dialog. &nbsp; It calls one of the <code>BootstrapModalResult</code> constructor methods to build the correct <code>BootstrapModalResult</code> response. &nbsp;</p>
+
+<pre lang="html">@inherits ComponentBase
+@namespace CEC.Blazor.Components.UIControls
+&lt;UIContainer&gt;
+    &lt;UIRow&gt;
+        &lt;UIColumn Columns="12"&gt;
+            @((MarkupString)this.Message)
+        &lt;/UIColumn&gt;
+        &lt;UIButtonColumn Columns="12"&gt;
+            &lt;button type="button" class="btn btn-danger" @onclick="(e =&gt; this.Close(true))"&gt;Exit&lt;/button&gt;
+            &lt;button type="button" class="btn btn-success" @onclick="(e =&gt; this.Close(false))"&gt;Cancel&lt;/button&gt;
+        &lt;/UIButtonColumn&gt;
+    &lt;/UIRow&gt;
+&lt;/UIContainer&gt;
+</pre>
+
+<pre lang="c#">public partial class YesNo : ComponentBase
+{
+    [CascadingParameter]
+    public BootstrapModal Parent { get; set; }
+
+    [Parameter]
+    public string Message { get; set; } = "Are You Sure?";
+
+    public void Close(bool state)
+    {
+        if (state) this.Parent.Close(BootstrapModalResult.Exit());
+        else this.Parent.Close(BootstrapModalResult.Cancel());
+    }
+}
+</pre>
+
+<h3>Form using BootstrapModal</h3>
+
+<p>Declare the component in your form - I normally do it at the bottom. &nbsp; The button control is just to "demo" activating the <code>YesNoDialog</code>.</p>
+
+<pre lang="c#">&lt;div&gt;
+    &lt;button type="button" class="btn btn-danger" @onclick="(e =&gt; this.AreYouSure())"&gt;Ask Are You Sure&lt;/button&gt;
+&lt;/div&gt;
+
+&lt;BootstrapModal @ref="this._BootstrapModal"&gt;&lt;/BootstrapModal&gt;
+</pre>
+
+<p>Define a referenced Property in your form.</p>
+
+<pre lang="c#">protected BootstrapModal _BootstrapModal { get; set; }
+</pre>
+
+<p>And implement an action handler to open the modal dialog. &nbsp;This:</p>
+
+<ol start="1"><li>Creates a ModalOptions object to set up the modal dialog appearance.</li>
+
+<li>Adds any necessary parameters.</li>
+
+<li>Calls and awaits `Show` on the `BootstrapModal` instance to turn on the Modal, passing the component to display as generic T.</li>
+
+<li>Responds to the result when the modal is closed.</li>
+
+</ol>
+
+<pre lang="c#">protected async void AreYouSureAsync()
+{
+    var modalOptions = new BootstrapModalOptions()
+    {
+        ModalBodyCSS = "p-0",
+        ModalCSS = "modal-xl",
+        HideHeader = true,
+    };
+    modalOptions.Parameters.Add("NotUsedParameter", -1);
+    var result = await this._BootstrapModal.Show&lt;YesNoModal&gt;(modalOptions);
+    if (result.ResultType == BootstrapModalResultType.Cancel) {
+        //Do something to stop
+    }
+}
+</pre>
+
+<h2>Wrap Up</h2>
+
+<p>While the modal dialog is implemented using Bootstrap, you can change the Markup to fit any other CSS framework or your own custom CSS.</p>
+
+<p>If your looking for a more complex Modal Dialog with more features take a look at <a href="https://github.com/Blazored/Modal">Blazored Modal Dialog</a>.</p>
+
+<pre lang="c#"></pre>
+
+<pre lang="c#"></pre>
+
+
+</body>
+</html>

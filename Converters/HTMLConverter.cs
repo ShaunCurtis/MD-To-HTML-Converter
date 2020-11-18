@@ -27,21 +27,21 @@ namespace MD_To_HTML_Converter.Converters
                 {
                     _Rules = new List<ConverterRule>();
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.BoldBlock, IsBlock = false, ConverterMethod = AsHtml });
-                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.CodeBlock, IsBlock = true, ConverterMethod = AsHtml });
+                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.CodeBlock, IsBlock = true, IsLineBlock = true, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.CodeLine, IsBlock = true, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.HeadingBlock, IsBlock = true, ConverterMethod = AsHtmlHeader });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.ImageBlock, IsBlock = false, ConverterMethod = AsHtmlImageBlock });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.ItalicsBlock, IsBlock = false, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.LinkBlock, IsBlock = false, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.ListItemBlock, IsBlock = true, ConverterMethod = AsHtml });
-                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.OrderedListBlock, IsBlock = true, ConverterMethod = AsHtml });
+                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.OrderedListBlock, IsBlock = true, IsLineBlock = true, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.ParagraphBlock, IsBlock = true, ConverterMethod = AsHtml });
-                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.QuoteBlock, IsBlock = false, ConverterMethod = AsHtml });
-                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.TableBlock, IsBlock = false, ConverterMethod = AsHtml });
-                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.TaskBlock, IsBlock = false, ConverterMethod = AsHtml });
+                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.QuoteBlock, IsBlock = true, IsLineBlock = true, ConverterMethod = AsHtml }); ;
+                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.TableBlock, IsBlock = false, IsLineBlock = true, ConverterMethod = AsHtml });
+                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.TaskBlock, IsBlock = false, IsLineBlock = true, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.TextBlock, IsBlock = false, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.UnderlineBlock, IsBlock = false, ConverterMethod = AsHtml });
-                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.UnOrderedListBlock, IsBlock = true, ConverterMethod = AsHtml });
+                    _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.UnOrderedListBlock, IsBlock = true, IsLineBlock = true, ConverterMethod = AsHtml });
                     _Rules.Add(new ConverterRule() { BlockType = DOTBlockType.VariableBlock, IsBlock = false, ConverterMethod = AsHtml });
                 }
                 return _Rules;
@@ -69,7 +69,8 @@ namespace MD_To_HTML_Converter.Converters
             var html = new StringBuilder();
             var rule = Rules.FirstOrDefault(item => item.BlockType == node.BlockType);
             if (!string.IsNullOrEmpty(node.Text)) html.Append(HTMLCharacterConverter.Replace(node.Text));
-            html.Append(AddSubNodes(node));
+            if (rule.IsLineBlock) html.AppendLine(AddSubNodes(node));
+            else html.Append(AddSubNodes(node));
             return AddTagWrapper(rule, node.GetAttributeString(), html.ToString());
         }
 
@@ -89,7 +90,7 @@ namespace MD_To_HTML_Converter.Converters
             var rule = Rules.FirstOrDefault(item => item.BlockType == node.BlockType);
             if (!string.IsNullOrEmpty(node.Text)) html.Append(HTMLCharacterConverter.Replace(node.Text));
             html.Append(AddSubNodes(node));
-            return AddTagWrapper(rule, node.GetAttributeString(), html.ToString(), $"{node.GetValue("Level")}");
+            return AddTagWrapper(rule, node.GetAttributeString(), html.ToString(), $"{node.GetValue("level")}");
         }
 
         private string AsHtmlImageBlock(IDOTNode node)
@@ -120,7 +121,7 @@ namespace MD_To_HTML_Converter.Converters
                     var rule = Rules.FirstOrDefault(item => item.BlockType == n.Value.BlockType);
                     if (rule != null)
                     {
-                        if (rule.IsBlock) html.AppendLine(rule.ConverterMethod(n.Value));
+                        if (rule.IsLineBlock) html.AppendLine(rule.ConverterMethod(n.Value));
                         else html.Append(rule.ConverterMethod(n.Value));
                     }
                 }

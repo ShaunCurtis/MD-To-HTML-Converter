@@ -11,6 +11,8 @@ namespace MD_To_HTML_Converter.Converters
 
         public bool IsBlock { get; set; } = true;
 
+        public bool IsLineBlock { get; set; } = false;
+
         public string Tag(string level = "1") => this.BlockType switch
         {
             DOTBlockType.BoldBlock => "strong",

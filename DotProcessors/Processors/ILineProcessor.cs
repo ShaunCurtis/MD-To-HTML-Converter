@@ -5,10 +5,12 @@ using System.Text;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    public interface IDOTProcessor
+    public interface ILineProcessor
     {
         public string Name { get; }
                 
         public bool Process(DocumentObjectTree Dot);
+
+        public bool ProcessNode(IDOTNode node);
     }
 }

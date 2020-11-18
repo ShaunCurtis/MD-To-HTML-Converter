@@ -20,26 +20,26 @@ namespace MD_To_HTML_Converter
             { 40, new ParagraphPreProcessor()}
         };
 
-        static SortedList<int, IDOTProcessor> Processors = new SortedList<int, IDOTProcessor>()
+        static SortedList<int, ILineProcessor> Processors = new SortedList<int, ILineProcessor>()
         {
-            { 0, new ExpressionProcessor() {
+            { 0, new ExpressionLineProcessor() {
                 BlockType = DOTBlockType.BoldBlock,
                 Expression = @"(.*)[\*]{2}(.*)[\*]{2}(.*)"
             } },
-            { 10, new ExpressionProcessor() { 
+            { 10, new ExpressionLineProcessor() { 
                 BlockType = DOTBlockType.ItalicsBlock, 
                 Expression = @"(.*)[\*]{1}(.*)[\*]{1}(.*)" 
             } },
-            { 20, new ExpressionProcessor() { 
+            { 20, new ExpressionLineProcessor() { 
                 BlockType = DOTBlockType.VariableBlock, 
                 Expression = @"(.*)[\`]{1}(.+)[\`]{1}(.*)" 
             } },
-            { 30, new ExpressionProcessor() { 
+            { 30, new ExpressionLineProcessor() { 
                 BlockType = DOTBlockType.ImageBlock, 
                 Expression = @"(.*)[\!][\[]{1}(.+)[\]]{1}\s*[\(]{1}(.+)[\)]{1}(.*)", 
                 Attributes = new Dictionary<int, string>() { { 3, "src" } }
             } },
-            { 40, new ExpressionProcessor() { 
+            { 40, new ExpressionLineProcessor() { 
                 BlockType = DOTBlockType.LinkBlock, 
                 Expression = @"(.*)[\[]{1}(.+)[\]]{1}\s*[\(]{1}(.+)[\)]{1}(.*)", 
                 Attributes = new Dictionary<int, string>() { { 3, "href" } }
@@ -53,23 +53,26 @@ namespace MD_To_HTML_Converter
             new HTMLConverter(),
         };
 
+        static IInputProcessor InputProcessor => new MDInputProcessor();
+
         static void Main(string[] args)
         {
             Console.WriteLine("Markdown to HTML Coverter");
 
             string workingdir = @"C:\Users\Shaun.Obsidian\source\repos\MD-To-HTML-Converter\MD";
 
-            // Get the directory
-            var value = string.Empty;
-            Console.Write(string.Concat("Directory to process? (default=", workingdir, ")"));
-            value = Console.ReadLine();
-            workingdir = string.IsNullOrEmpty(value) ? workingdir : value;
+            //// Get the directory
+            //var value = string.Empty;
+            //Console.Write(string.Concat("Directory to process? (default=", workingdir, ")"));
+            //value = Console.ReadLine();
+            //workingdir = string.IsNullOrEmpty(value) ? workingdir : value;
 
-            // Get the directory
-            value = string.Empty;
-            Console.Write(string.Concat("Show Debug Information? (default=", "N", ")"));
-            value = Console.ReadLine();
-            var debug = value.ToUpper() == "Y";
+            //// Get the directory
+            //value = string.Empty;
+            //Console.Write(string.Concat("Show Debug Information? (default=", "Y", ")"));
+            //value = Console.ReadLine();
+            //var debug = value.ToUpper() == "Y";
+            var debug = true;
 
             // Loop through each MD files in the directory
             foreach (var file in Directory.GetFiles(workingdir, "*.md"))
@@ -84,25 +87,28 @@ namespace MD_To_HTML_Converter
                     var dot = new DOTNode() { NodeType = DOTNodeType.Raw, Text = line };
                     Dot.RootNode.AddNode(dot);
                 }
-
                 Console.WriteLine("Building Document Object Tree");
                 if (debug) OutputTree();
-                foreach (var proc in PreProcessors)
-                {
-                    if (debug) Console.WriteLine($"Running {proc.Value.Name}");
-                    proc.Value.Process(Dot);
-                }
-                foreach (var node in Dot.RootNode.Nodes)
-                {
-                    foreach (var proc in Processors)
-                    {
-                        if (debug) Console.WriteLine($"Running {proc.Value.Name}");
-                        proc.Value.Process(Dot);
-                    }
-                }
+
+                InputProcessor.Process(Dot);
+
+                //foreach (var proc in PreProcessors)
+                //{
+                //    if (debug) Console.WriteLine($"Running {proc.Value.Name}");
+                //    proc.Value.Process(Dot);
+                //}
+                //foreach (var node in Dot.RootNode.Nodes)
+                //{
+                //    foreach (var proc in Processors)
+                //    {
+                //        if (debug) Console.WriteLine($"Running {proc.Value.Name}");
+                //        proc.Value.Process(Dot);
+                //    }
+                //}
                 if (debug) Dot.ToConsole();
+
                 Console.WriteLine("Running Converters");
-                foreach ( var converter in Converters)
+                foreach (var converter in Converters)
                 {
                     var outputfilename = file.Replace("md", "html");
                     var html = HTMLConverter.RunConvert(Dot, true);
