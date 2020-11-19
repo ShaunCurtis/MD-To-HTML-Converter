@@ -6,4 +6,8 @@
     <RootNamespace>MD_To_HTML_Converter</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="DotProcessors\OldProcessors\" />
+  </ItemGroup>
+
 </Project>

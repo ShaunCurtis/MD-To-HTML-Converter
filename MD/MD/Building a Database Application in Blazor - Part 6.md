@@ -23,12 +23,11 @@ As we're building both Server and WASM deployments, we have 4 projects to which 
 3. **CEC.Blazor.WASM.Client** - the WASM project
 4. **CEC.Blazor.WASM.Server** - the API server for the WASM project
 
-The majority of code is library code in CEC.Weather.
+The majority of code is library code in CEC.Blazor.
 
 ## Sample Project and Code
 
-The base code is here in the [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Weather).
-The completed code for this article is in [CEC.Weather GitHub Repository](https://github.com/ShaunCurtis/CEC.Weather).
+The base code is here in the [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor).
 
 ## Overview of the Process
 

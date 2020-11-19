@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    class DOTPreProcessor : IDOTPreProcessor
+    class BlockPreProcessor : IBlockPreProcessor
     {
 
         public virtual string Name { set; get; } = "Pre-Processor";

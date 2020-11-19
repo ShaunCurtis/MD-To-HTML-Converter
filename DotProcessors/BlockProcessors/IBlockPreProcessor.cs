@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace MD_To_HTML_Converter.DotProcessors
 {
-    public interface IDOTPreProcessor
+    public interface IBlockPreProcessor
     {
         public string Name { get; }
 

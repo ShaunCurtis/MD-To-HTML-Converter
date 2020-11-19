@@ -56,6 +56,8 @@ namespace MD_To_HTML_Converter.Converters
             this.Dot = dot;
             this.FullHtml = fullHtml;
 
+            this.IndexTree(dot.RootNode);
+
             if (Dot.RootNode != null)
             {
                 html = this.AddSubNodes(Dot.RootNode);
@@ -64,12 +66,21 @@ namespace MD_To_HTML_Converter.Converters
             else return html.ToString();
         }
 
+        private void IndexTree(IDOTNode parentnode)
+        {
+            foreach (var node in parentnode.Nodes)
+            {
+                node.Value.ParentNode = parentnode;
+                if (node.Value.Nodes.Count > 0) this.IndexTree(node.Value);
+            }
+        }
+
         private string AsHtml(IDOTNode node)
         {
             var html = new StringBuilder();
             var rule = Rules.FirstOrDefault(item => item.BlockType == node.BlockType);
             if (!string.IsNullOrEmpty(node.Text)) html.Append(HTMLCharacterConverter.Replace(node.Text));
-            if (rule.IsLineBlock) html.AppendLine(AddSubNodes(node));
+            if (node.BlockType == DOTBlockType.CodeLine) html.AppendLine(AddSubNodes(node));
             else html.Append(AddSubNodes(node));
             return AddTagWrapper(rule, node.GetAttributeString(), html.ToString());
         }
@@ -137,6 +148,7 @@ namespace MD_To_HTML_Converter.Converters
                 var html = new StringBuilder();
                 var tag = $"<{$"{rule.Tag(level)} {attributes}".Trim()}>";
                 html.Append(tag);
+                if (rule.IsBlock) html.Append(Environment.NewLine);
                 html.Append(body);
                 tag = $"</{rule.Tag(level)}>";
                 html.Append(tag);
@@ -148,7 +160,7 @@ namespace MD_To_HTML_Converter.Converters
         private string HtmlWrapper(string body, string head = "")
         {
             var html = new StringBuilder();
-             html.AppendLine($"<!DOCTYPE html>");
+            html.AppendLine($"<!DOCTYPE html>");
             html.AppendLine($"<html>");
             html.AppendLine($"<link rel = \"stylesheet\" type = \"text/css\" href = \"https://codeproject.freetls.fastly.net/App_Themes/CodeProject/Css/Main.css?dt=2.8.20201113.1\" />");
             html.AppendLine($"<head>");

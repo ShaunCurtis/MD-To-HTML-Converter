@@ -22,6 +22,8 @@ namespace MD_To_HTML_Converter.Data
 
         public string Text { get; set; }
 
+        public IDOTNode ParentNode { get; set; } 
+
         public bool GetAttribute(string key, out object value)
         {
             value = null;

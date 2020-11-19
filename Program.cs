@@ -11,40 +11,6 @@ namespace MD_To_HTML_Converter
 {
     class Program
     {
-        static SortedList<int, IDOTPreProcessor> PreProcessors => new SortedList<int, IDOTPreProcessor>()
-        {
-            { 0, new CodePreProcessor()},
-            { 10, new EmptyLinePreProcessor()},
-            { 20,new ListPreProcessor() },
-            { 30, new HeaderPreProcessor() },
-            { 40, new ParagraphPreProcessor()}
-        };
-
-        static SortedList<int, ILineProcessor> Processors = new SortedList<int, ILineProcessor>()
-        {
-            { 0, new ExpressionLineProcessor() {
-                BlockType = DOTBlockType.BoldBlock,
-                Expression = @"(.*)[\*]{2}(.*)[\*]{2}(.*)"
-            } },
-            { 10, new ExpressionLineProcessor() { 
-                BlockType = DOTBlockType.ItalicsBlock, 
-                Expression = @"(.*)[\*]{1}(.*)[\*]{1}(.*)" 
-            } },
-            { 20, new ExpressionLineProcessor() { 
-                BlockType = DOTBlockType.VariableBlock, 
-                Expression = @"(.*)[\`]{1}(.+)[\`]{1}(.*)" 
-            } },
-            { 30, new ExpressionLineProcessor() { 
-                BlockType = DOTBlockType.ImageBlock, 
-                Expression = @"(.*)[\!][\[]{1}(.+)[\]]{1}\s*[\(]{1}(.+)[\)]{1}(.*)", 
-                Attributes = new Dictionary<int, string>() { { 3, "src" } }
-            } },
-            { 40, new ExpressionLineProcessor() { 
-                BlockType = DOTBlockType.LinkBlock, 
-                Expression = @"(.*)[\[]{1}(.+)[\]]{1}\s*[\(]{1}(.+)[\)]{1}(.*)", 
-                Attributes = new Dictionary<int, string>() { { 3, "href" } }
-            } },
-        };
 
         static DocumentObjectTree Dot;
 
@@ -92,19 +58,6 @@ namespace MD_To_HTML_Converter
 
                 InputProcessor.Process(Dot);
 
-                //foreach (var proc in PreProcessors)
-                //{
-                //    if (debug) Console.WriteLine($"Running {proc.Value.Name}");
-                //    proc.Value.Process(Dot);
-                //}
-                //foreach (var node in Dot.RootNode.Nodes)
-                //{
-                //    foreach (var proc in Processors)
-                //    {
-                //        if (debug) Console.WriteLine($"Running {proc.Value.Name}");
-                //        proc.Value.Process(Dot);
-                //    }
-                //}
                 if (debug) Dot.ToConsole();
 
                 Console.WriteLine("Running Converters");

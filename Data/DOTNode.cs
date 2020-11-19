@@ -6,6 +6,8 @@ namespace MD_To_HTML_Converter.Data
 {
     class DOTNode : IDOTNode, ICloneable
     {
+        public IDOTNode ParentNode { get; set; }
+
         public DOTBlockType BlockType { get; set; }
 
         public DOTNodeType NodeType { get; set; } = DOTNodeType.None;

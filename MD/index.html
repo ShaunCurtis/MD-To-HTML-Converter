@@ -5,36 +5,70 @@
 
 </head>
 <body>
-<h1>Part 3 - View Components - CRUD Edit and View Operations in the UI</h1>
-<h1>Introduction</h1>
-<p>This is the third in a series of articles looking at how to build and structure a real Database Application in Blazor. &nbsp;The articles so far are:</p>
-<ul start="-"><li><a href="https://www.codeproject.com/Articles/5279560/Building-a-Database-Application-in-Blazor-Part-1-P">Project Structure and Framework</a></li>
-<li><a href="https://www.codeproject.com/Articles/5279596/Building-a-Database-Application-in-Blazor-Part-2-S">Services - Building the CRUD Data Layers</a></li>
-
+<h1>
+Part 3 - View Components - CRUD Edit and View Operations in the UI</h1>
+<h1>
+Introduction</h1>
+<p>
+This is the third in a series of articles looking at how to build and structure a real Database Application in Blazor. &nbsp;The articles so far are:</p>
+<ul start="-">
+<li>
+<a href="https://www.codeproject.com/Articles/5279560/Building-a-Database-Application-in-Blazor-Part-1-P">Project Structure and Framework</a></li>
+<li>
+<a href="https://www.codeproject.com/Articles/5279596/Building-a-Database-Application-in-Blazor-Part-2-S">Services - Building the CRUD Data Layers</a></li>
 </ul>
 
-<p>This article looks in detail at building reusable CRUD presentation layer components, specifically Edit and View functionality - and using them in Server and WASM projects.</p>
-<h2>Sample Project and Code</h2>
-<p>The UI is more radical:</p>
-<ol start="1"><li>A custom <code>Component</code> class is used as the base UI component - <code>ControlBase</code> is only used by the out-of-the-box data controls.</li>
-<li>Routing is discarded. &nbsp; There's a new <code>ViewManager</code> that manages the UI.</li>
-<li>A custom <code>Component</code> class is used as the base UI component - <code>ControlBase</code> is only used by the out-of-the-box data controls.</li>
-<li>Routing is discarded. &nbsp; There's a new <code>ViewManager</code> that manages the UI.</li>
-
+<p>
+This article looks in detail at building reusable CRUD presentation layer components, specifically Edit and View functionality - and using them in Server and WASM projects.</p>
+<h2>
+Sample Project and Code</h2>
+<p>
+The UI is more radical:</p>
+<ol start="1">
+<li>
+A custom <code>Component</code> class is used as the base UI component - <code>ControlBase</code> is only used by the out-of-the-box data controls.</li>
+<li>
+Routing is discarded. &nbsp; There's a new <code>ViewManager</code> that manages the UI.</li>
+<li>
+A custom <code>Component</code> class is used as the base UI component - <code>ControlBase</code> is only used by the out-of-the-box data controls.</li>
+<li>
+Routing is discarded. &nbsp; There's a new <code>ViewManager</code> that manages the UI.</li>
 </ol>
 
-<p><img src="https://github.com/ShaunCurtis/CEC-Publish/blob/master/Images/CEC.Blazor.WASM.Client-2.png?raw=true" alt="Project Files"></img></p>
-<pre lang="c#">// CEC.Blazor/Components/Base/BaseForm.csprivate IServiceScope _scope;/// Scope Factory to manage Scoped Services[Inject] protected IServiceScopeFactory ScopeFactory { get; set; } = default!;/// Gets the scoped IServiceProvider that is associated with this component.protected IServiceProvider ScopedServices{    get    {        if (ScopeFactory == null) throw new InvalidOperationException("Services cannot be accessed before the component is initialized.");        if (IsDisposed) throw new ObjectDisposedException(GetType().Name);        _scope ??= ScopeFactory.CreateScope();        return _scope.ServiceProvider;    }}
+<p>
+<img src="https://github.com/ShaunCurtis/CEC-Publish/blob/master/Images/CEC.Blazor.WASM.Client-2.png?raw=true" alt="Project Files"></img></p>
+<pre lang="c#">
+// CEC.Blazor/Components/Base/BaseForm.cs
+private IServiceScope _scope;
+
+/// Scope Factory to manage Scoped Services
+[Inject] protected IServiceScopeFactory ScopeFactory { get; set; } = default!;
+
+/// Gets the scoped IServiceProvider that is associated with this component.
+protected IServiceProvider ScopedServices
+{
+    get
+    {
+        if (ScopeFactory == null) throw new InvalidOperationException("Services cannot be accessed before the component is initialized.");
+        if (IsDisposed) throw new ObjectDisposedException(GetType().Name);
+        _scope ??= ScopeFactory.CreateScope();
+        return _scope.ServiceProvider;
+    }
+}
 </pre>
 
-<p>Blah Blah <code>Blah</code>.</p>
-<blockquote>dddd eeeee 
-</blockquote>
+<p>
+Blah Blah <code>Blah</code>.</p>
+<blockquote>
+dddd eeeee </blockquote>
 
-<h2>History</h2>
-<ul start="-"><li>19-Sep-2020: Initial version.</li>
-<li>17-Nov-2020: Major <strong>Blazor.CEC</strong> library changes. &nbsp; Change to ViewManager from Router and new Component base implementation.</li>
-
+<h2>
+History</h2>
+<ul start="-">
+<li>
+19-Sep-2020: Initial version.</li>
+<li>
+17-Nov-2020: Major <strong>Blazor.CEC</strong> library changes. &nbsp; Change to ViewManager from Router and new Component base implementation.</li>
 </ul>
 
 
