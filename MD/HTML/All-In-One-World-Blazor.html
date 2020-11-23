@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html>
+<link rel = "stylesheet" type = "text/css" href = "https://codeproject.freetls.fastly.net/App_Themes/CodeProject/Css/Main.css?dt=2.8.20201113.1" />
+<head>
+
+</head>
+<body>
+<h1>
+Building a Site that Delivers Blazor Server and WASM</h1>
+<h2>
+Overview</h2>
+<p>
+This article looks at solving the challenges in creating a combined Blazor WASM and Server application - built in the same solution, and run on the same web site.</p>
+<p>
+Motivation - well it's got to be possible!</p>
+<h2>
+The Challenges</h2>
+<h4>
+Routing</h4>
+<p>
+The biggest, but not the most obvious is routing. &nbsp;If I go to https://mysite/weatherforecast/1 what do you do? Open it in WASM or Server?  You could use https://mysite/wasm/weatherforecast/1 but that's clunky, with different routing paths to hanlde different scenarios. &nbsp; You quickly start trying to jump tho' hoops backwards. &nbsp; So, what does routing actually do?</p>
+<ol start="1">
+<li>
+Navigation happens typically by clicking on an <code>&lt;a&gt;</code> or call <code>NavigationManager</code> directly. &nbsp; All paths lead to the Navigation Manager raising a navigation event.</li>
+<li>
+The Router wires itself into the <code>NavigationManager</code> navigation event and gets called.</li>
+<li>
+It looks up the route in its routing table (built by trawling the site for <code>@page</code> references) and matches the Url to it's associated <code>IComponent</code> class.</li>
+<li>
+It renders itself (it's a component at the base of the RenderTree so queues a render event on the Renderer) using the <i>layout</i> specified and passing the layout the new component.</li>
+</ol>
+
+<h4>
+Shared Code Base</h4>
+<ul start="-">
+<li>
+How do we have one copy of <code>App.razor</code>, <code>Index.razor</code>,... &nbsp; (We don't want duplicates)?</li>
+<li>
+How do we fix the slightly different data access models used?</li>
+</ul>
+
+<h4>
+A Single Web Site that Switches between Applications</h4>
+<ul start="-">
+<li>
+How do we structure a single website, with paths and access to shared functionality?  </li>
+<li>
+How do we separate loading of each application?</li>
+</ul>
+
+<h2>
+Code and Examples</h2>
+<p>
+The Repo is <a href="https://github.com/ShaunCurtis/AllinOne">here at Github</a>.</p>
+<p>
+You can view the site on Azure <a href="https://allinoneserver.azurewebsites.net/">here at https://allinoneserver.azurewebsites.net/</a></p>
+<h2>
+The Solution</h2>
+<p>
+The solution is built using standard issue Visual Studio Community Edition. &nbsp; It's DotNetCore 3.1. &nbsp; The starting point is a out-of-the-box solution created with the Blazor WASM template with ASP.NET Core hosted set. &nbsp; You get three projects - Client, Server, Shared - in your solution. &nbsp; Run it before making any changes to make sure it works!</p>
+<p>
+We're going to re-structure the solution so:</p>
+<ul start="-">
+<li>
+<i>Client</i> holds the minimum code to build the WASM application.</li>
+<li>
+<i>Server</i> holds the minimum code to build the Server application, and run the web site.</li>
+<li>
+<i>Shared</i> holds almost all the C# code - everything we can share.</li>
+</ul>
+
+<p>
+Your starting point looks like this.</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/AllinOne/master/images/Starting-Solution.png?raw=true" alt="client"></img></p>
+<h2>
+Shared Project</h2>
+<p>
+Open the Shared Project configuration files (double-click on the project title in Solution Explorer).</p>
+<ol start="1">
+<li>
+Set the project Sdk to <code>Microsoft.NET.Sdk.Razor</code> and the language version. &nbsp; This ensures Visual Studio handles razor files correctly.</li>
+<li>
+Add the necessary packages. &nbsp; You can either use Nuget or just copy and paste into the file. &nbsp; Visual Studio will install them when you save the project file.</li>
+</ol>
+
+<pre lang="xml">
+&lt;Project Sdk="Microsoft.NET.Sdk.Razor"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;netstandard2.1&lt;/TargetFramework&gt;
+    &lt;RazorLangVersion&gt;3.0&lt;/RazorLangVersion&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="3.2.1" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="3.2.1" PrivateAssets="all" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.2.0" /&gt;
+    &lt;PackageReference Include="System.Net.Http.Json" Version="3.2.0" /&gt;
+  &lt;/ItemGroup&gt;
+
+&lt;/Project&gt;
+</pre>
+
+<h2>
+Project Restructuring</h2>
+<h3>
+Shared</h3>
+<p>
+Create the following folder structure in <i>Shared</i>.</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/AllinOne/master/images/shared-folders.png?raw=true" alt="Shared Folder Structure"></img></p>
+<p>
+Move or create the following files in Controls:</p>
+<p>
+(all classes should be in the <i>solution</i>.Shared.Component namespace)</p>
+<ul start="-">
+<li>
+MainLayout.razor (move from Client)</li>
+<li>
+NavMenu.razor (move from Client)</li>
+<li>
+Server.razor (create as new Razor Component)</li>
+<li>
+ServerLayout.razor (create as new Razor Component)</li>
+<li>
+SurveyPrompt.razor (move from Client)</li>
+<li>
+ViewLink.cs (create as new class)</li>
+<li>
+WASM.razor (create as new Razor Component)</li>
+<li>
+WASMLayout.razor (create as new Razor Component)</li>
+</ul>
+
+<p>
+Create the following files in ViewManager:</p>
+<blockquote>
+[Link to Repo](https://github.com/ShaunCurtis/AllinOne/tree/master/All-In-One/Shared/Components/ViewManager)</blockquote>
+
+<ul start="-">
+<li>
+IView.cs (New or from the Repo)</li>
+<li>
+ViewBase.cs (New or from the Repo)</li>
+<li>
+ViewData.cs (New or from the Repo)</li>
+<li>
+ViewManager.cs (New or from the Repo)</li>
+</ul>
+
+<p>
+Move or create the following files in Views:</p>
+<ul start="-">
+<li>
+Index.razor (copy from Client)</li>
+<li>
+Counter.razor (copy from Client)</li>
+<li>
+FetchData.razor (copy from Client)</li>
+</ul>
+
+<p>
+Move or create the following files in Data:</p>
+<p>
+(all classes should be in the <i>solution</i>.Shared.Data namespace)</p>
+<ul start="-">
+<li>
+IWeatherForecastService.cs (create as new interface)</li>
+<li>
+WeatherForecast.cs (move from root)</li>
+<li>
+WeatherForecastService.cs (create as new class)</li>
+<li>
+WeatherForecastWASMService.cs (create as new class)</li>
+</ul>
+
+<p>
+Your Shared project should now look like this:</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/AllinOne/master/images/shared-files.png?raw=true" alt="shared files"></img></p>
+<h3>
+Client</h3>
+<ul start="-">
+<li>
+Move the <i>wwwroot</i> folder to the Server project.</li>
+<li>
+Delete <i>App.razor</i></li>
+<li>
+Delete <i>_imports.razor</i></li>
+<li>
+Delete <i>Pages</i></li>
+</ul>
+
+<p>
+Your Client project should now look like this (a program class):</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/AllinOne/master/images/Client-Project.png?raw=true" alt="client project"></img></p>
+<h3>
+Server</h3>
+<ul start="-">
+<li>
+Rename <i>_Layout.cshtml</i> to <i>_Host.cshtml</i> and move it to <i>Pages</i> </li>
+<li>
+Delete <i>Shared</i></li>
+<li>
+Rename <i>wwwroot/index.html</i> to <i>wasm.html</i>.</li>
+</ul>
+
+<p>
+Your Server project should now look like this (a program class):</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/AllinOne/master/images/Server-Project.png?raw=true" alt="server project"></img></p>
+<h2>
+The Shared Project Code</h2>
+<h3>
+Data and Services</h3>
+<p>
+The first challenge is how to handle data access in <code>Fetchdata</code>. &nbsp; The Server version just makes it up, the WASM version makes an API call. &nbsp;The API code makes it up. &nbsp; We need a standardised interface for <code>Fetchdata</code>.</p>
+<p>
+We solve this by using Interface dependency injection:</p>
+<ul start="-">
+<li>
+defining an interface for the data service <code>IWeatherForecastService</code> that <code>Fetchdata</code> uses to access data.</li>
+<li>
+Loading <code>IWeatherForecastService</code> interface service in the Service Containers for the WASM and Server applications.</li>
+</ul>
+
+<p>
+<code>Fetchdata</code> defines an injected property of type <code>IWeatherForecastService</code>. &nbsp; The application injects whichever <code>IWeatherForecastService</code> is configured, <code>WeatherForecastService</code> in Server and <code>IWeatherForecastWASMService</code> in WASM.</p>
+<p>
+This may be overcomplicated for here, but the purpose of this article is to solve the problems, not step round them.</p>
+<h4>
+WeatherForecast.cs</h4>
+<pre lang="c#">
+// sort the namespace
+namespace AllinOne.Shared.Data
+</pre>
+
+<h4>
+IWeatherForecastService.cs</h4>
+<p>
+Replace the template code with:</p>
+<pre lang="c#">
+using System.Threading.Tasks;
+
+namespace AllinOne.Shared.Data
+{
+    public interface IWeatherForecastService
+    {
+        public Task&lt;WeatherForecast[]&gt; GetForecastAsync();
+    }
+}
+</pre>
+
+<h4>
+WeatherForecastService</h4>
+<p>
+Replace the template code with:</p>
+<pre lang="c#">
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace AllinOne.Shared.Data
+{
+    // Implements IWeatherForecastService
+    public class WeatherForecastService : IWeatherForecastService
+    {
+        private static readonly string[] Summaries = new[]
+        {
+            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+        };
+
+        private WeatherForecast[] Forecasts;
+
+        // now create the dataset on startup
+        public WeatherForecastService()
+        {
+            var rng = new Random();
+            var startDate = DateTime.Now.AddDays(-14);
+            Forecasts =  Enumerable.Range(1, 5).Select(index =&gt; new WeatherForecast
+            {
+                Date = startDate.AddDays(index),
+                TemperatureC = rng.Next(-20, 55),
+                Summary = Summaries[rng.Next(Summaries.Length)]
+            }).ToArray();
+        }
+
+        // IWeatherForecastService implementation return the dataset
+        public virtual Task&lt;WeatherForecast[]&gt; GetForecastAsync() =&gt; Task.FromResult(Forecasts);
+
+    }
+}
+</pre>
+
+<h4>
+WeatherForecastWASMService.cs</h4>
+<p>
+Replace the template code with:</p>
+<pre lang="c#">
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
+
+namespace AllinOne.Shared.Data
+{
+    // Inherits from WeatherForecastService so we don't have to do anything twice
+    public class WeatherForecastWASMService : WeatherForecastService
+    {
+        private HttpClient Http { get; set; } = null;
+
+        // HttpClient gets injected at startup
+        public WeatherForecastWASMService( HttpClient http) =&gt; Http = http;
+
+        // IWeatherForecastService implementation calls the API on the server
+        public async override Task&lt;WeatherForecast[]&gt; GetForecastAsync() =&gt; await Http.GetFromJsonAsync&lt;WeatherForecast[]&gt;("WeatherForecast");
+    }
+}
+</pre>
+
+<p>
+Update the <code>WeatherForecastController</code> in the Server project. &nbsp; It becomes an "interface" to the server side data service.</p>
+<pre lang="c#">
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+// add reference
+using AllinOne.Shared.Data;
+
+namespace AllinOne.Server.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class WeatherForecastController : ControllerBase
+    {
+        private static readonly string[] Summaries = new[]
+        {
+            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+        };
+
+        private readonly ILogger&lt;WeatherForecastController&gt; logger;
+        
+        // add data service
+        private IWeatherForecastService DataService { get; set; }
+
+        //  Capture dataservice at initialisation 
+        public WeatherForecastController(ILogger&lt;WeatherForecastController&gt; logger, IWeatherForecastService dataService)
+        {
+            this.DataService = dataService;
+            this.logger = logger;
+        }
+
+        [HttpGet]
+        public async Task&lt;IEnumerable&lt;WeatherForecast&gt;&gt; Get()
+        {
+            // use the dataservice to get the data set - in this case the Server data service
+            return await DataService.GetForecastAsync();
+        }
+    }
+}
+</pre>
+
+<h3>
+View Manager</h3>
+<p>
+Moving on to the routing challenge. &nbsp; The solution implemented here below bypasses the journey through <code>NavigationManager</code> and <code>Router</code>. &nbsp; A new component <code>ViewManager</code> handles View management. &nbsp; It replaces Router directly. &nbsp; Components call the ViewManager directly to change the displayed View component.</p>
+<p>
+The full class code set isn't shown here - it's rather long.</p>
+<p>
+The classes/interfaces are:</p>
+<ul start="-">
+<li>
+<code>IView</code> interface. &nbsp; All Views need to implement this interface.</li>
+<li>
+<code>ViewBase</code> is the base class for all Views. &nbsp; It implements <code>IView</code>.</li>
+<li>
+<code>ViewData</code> is a configuration class for <code>ViewManager</code>.</li>
+<li>
+<code>ViewManager</code>. &nbsp; </li>
+</ul>
+
+<p>
+<code>ViewManager</code>:</p>
+<ol start="1">
+<li>
+Loads the view into a standard <code>Layout</code> in the same way as Router.</li>
+<li>
+Exposes <code>LoadViewAsync</code> as the main View loading method. &nbsp;There are various incarnations to handle different ways of passing view data.</li>
+<li>
+Cascades itself, so all components in the RenderTree have access to the running instance and can call <code>LoadViewAsync</code>.</li>
+<li>
+Maintains a history of views rendered.</li>
+<li>
+Can read data from a querystring.</li>
+</ol>
+
+<p>
+Copy or lift all the files in the <i>ViewManager</i> directory in the GitHub Repo. &nbsp; Change the root namespace on the files to match your project name if you haven't used <i>AllinOne</i>.</p>
+<p>
+Files</p>
+<ul start="-">
+<li>
+IView.cs</li>
+<li>
+ViewBase.cs</li>
+<li>
+ViewData.cs</li>
+<li>
+ViewManager.cs</li>
+</ul>
+
+<h3>
+Views</h3>
+<p>
+The old "Pages" become views. &nbsp;We:</p>
+<ul start="-">
+<li>
+Set to inherit from <code>ViewBase</code> and the namespace.</li>
+<li>
+Include all assembly references - we're now in a library environment with no <code>_Imports.razor</code>.</li>
+<li>
+Remove all the <code>@page</code> directives. &nbsp; They're obselete.</li>
+</ul>
+
+<p>
+<i>Counter.razor</i> & <i>Index.razor</i></p>
+<pre lang="c#">
+//  Add the follow @using directives
+//  We're now in a Libary and razor files don't have access to a _Imports.razor so we need to reference all the libraries we use
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using AllinOne.Shared.Data
+// Add inheritance from ViewBase. &nbsp; We get the the cascaded ViewManager and IView interface. &nbsp;
+@inherits ViewBase
+// Set the namespace
+@namespace AllinOne.Shared.Components
+// Remove the @page directive. &nbsp; It's redundant as we're not using routing
+//@page "/"
+</pre>
+
+<p>
+<i>FetchData.razor</i></p>
+<pre lang="c#">
+//  Add the follow @using directives
+//  We're now in a Libary and razor files don't have access to a _Imports.razor so we need to reference all the libraries we use
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using AllinOne.Shared.Data
+// Add inheritance from ViewBase. &nbsp; We get the the cascaded ViewManager and IView interface. &nbsp;
+@inherits ViewBase
+@namespace AllinOne.Shared.Components
+// Remove the @page directive. &nbsp; It's redundant as we're not using routing
+//@page "/fetchdata"
+// Remove the @inject directive. &nbsp; It's redundant as functionality has moved to the WeatherForecast data service
+//@inject HttpClient Http
+
+..... &nbsp;Markup
+
+@code {
+
+    // Injection of the IWeatherForecastService (WeatherForecastService in Server or WeatherForecastWASMService in WASM )
+    [Inject] IWeatherForecastService DataService { get; set; }
+
+    private WeatherForecast[] forecasts;
+
+    // Get the data from the service
+    protected override async Task OnInitializedAsync() =&gt; forecasts = await DataService.GetForecastAsync();
+}
+</pre>
+
+<h3>
+Controls</h3>
+<p>
+Replace the default code in <code>ViewLink</code>. &nbsp; This replicates <code>NavLink</code> providing application navigation between views.</p>
+<pre lang="c#">
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Web;
+
+namespace AllinOne.Shared.Components
+{
+    /// Builds a Bootstrap View Link to replicate NavLink but for View Navigation
+    public class ViewLink : ComponentBase
+    {
+        /// View Type to Load
+        [Parameter] public Type ViewType { get; set; }
+
+        /// View Paremeters for the View
+        [Parameter] public Dictionary&lt;string, object&gt; ViewParameters { get; set; } = new Dictionary&lt;string, object&gt;();
+
+        /// Child Content to add to Component
+        [Parameter]
+        public RenderFragment ChildContent { get; set; }
+
+        /// Cascaded ViewManager
+        [CascadingParameter] public ViewManager ViewManager { get; set; }
+
+        /// Boolean to check if the ViewType is the current loaded view
+        /// if so it's used to mark this component's CSS with "active" 
+        private bool IsActive =&gt; this.ViewManager.IsCurrentView(this.ViewType);
+
+        /// Captured Values
+        [Parameter(CaptureUnmatchedValues = true)] public IDictionary&lt;string, object&gt; AdditionalAttributes { get; set; }
+
+        /// Builds the render tree for the component
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            var css = string.Empty;
+            var viewData = new ViewData(ViewType, ViewParameters);
+
+            if (AdditionalAttributes != null && AdditionalAttributes.TryGetValue("class", out var obj))
+            {
+                css = Convert.ToString(obj, CultureInfo.InvariantCulture);
+            }
+            if (this.IsActive) css = $"{css} active";
+            builder.OpenElement(0, "a");
+            builder.AddAttribute(1, "class", css);
+            builder.AddMultipleAttributes(2, AdditionalAttributes);
+            builder.AddAttribute(3, "onclick", EventCallback.Factory.Create&lt;MouseEventArgs&gt;(this, e =&gt; this.ViewManager.LoadViewAsync(viewData)));
+            builder.AddContent(4, ChildContent);
+            builder.CloseElement();
+        }
+    }
+}
+</pre>
+
+<p>
+Update <i>NavMenu.razor</i> to handle switching between WASM and Server, and display which version we're running.</p>
+<pre lang="html">
+//  Add the follow @using directives
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Routing
+@using AllinOne.Shared.Components
+//  And Namespace directive
+@namespace AllinOne.Shared.Components
+
+&lt;div class="top-row pl-4 navbar navbar-dark"&gt;
+    &lt;a class="navbar-brand" href=""&gt;@navTitle&lt;/a&gt;
+    &lt;button class="navbar-toggler" @onclick="ToggleNavMenu"&gt;
+        &lt;span class="navbar-toggler-icon"&gt;&lt;/span&gt;
+    &lt;/button&gt;
+&lt;/div&gt;
+
+&lt;div class="@NavMenuCssClass" @onclick="ToggleNavMenu"&gt;
+    &lt;ul class="nav flex-column"&gt;
+        &lt;li class="nav-item px-3"&gt;
+            @if (IsWASM)
+            {
+                &lt;NavLink class="nav-link" href="/"&gt;
+                    &lt;span class="oi oi-browser" aria-hidden="true"&gt;&lt;/span&gt; Switch to Server
+                &lt;/NavLink&gt;
+            }
+            else
+            {
+                &lt;NavLink class="nav-link" href="wasm.html"&gt;
+                    &lt;span class="oi oi-browser" aria-hidden="true"&gt;&lt;/span&gt; Switch to WASM
+                &lt;/NavLink&gt;
+
+            }
+        &lt;/li&gt;
+        &lt;li class="nav-item px-3"&gt;
+            &lt;ViewLink class="nav-link" ViewType="typeof(Index)"&gt;
+                &lt;span class="oi oi-home" aria-hidden="true"&gt;&lt;/span&gt; Home
+            &lt;/ViewLink&gt;
+        &lt;/li&gt;
+        &lt;li class="nav-item px-3"&gt;
+            &lt;ViewLink class="nav-link" ViewType="typeof(Counter)"&gt;
+                &lt;span class="oi oi-home" aria-hidden="true"&gt;&lt;/span&gt; Counter
+            &lt;/ViewLink&gt;
+        &lt;/li&gt;
+        &lt;li class="nav-item px-3"&gt;
+            &lt;ViewLink class="nav-link" ViewType="typeof(FetchData)"&gt;
+                &lt;span class="oi oi-home" aria-hidden="true"&gt;&lt;/span&gt; Fetch Data
+            &lt;/ViewLink&gt;
+        &lt;/li&gt;
+    &lt;/ul&gt;
+&lt;/div&gt;
+</pre>
+
+<pre lang="c#">
+
+@code {
+    [Parameter] public bool IsWASM { get; set; }
+
+    private string navTitle =&gt; IsWASM ? "All-in-One WASM" : "All-in-One Server";
+
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass =&gt; collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}
+</pre>
+
+<p>
+Update <i>SurveyPrompt.razor</i></p>
+<pre lang="c#">
+//  Add the follow @using directives
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Routing
+//  And Namespace directive
+@namespace AllinOne.Shared.Components
+</pre>
+
+<p>
+Update <i>MainLayout</i></p>
+<pre lang="c#">
+//  Add the follow @using directives
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Routing
+@inherits LayoutComponentBase
+//  And Namespace directive
+@namespace AllinOne.Shared.Components
+</pre>
+
+<p>
+Copy the contents of <code>MainLayout</code> into <code>ServerLayout</code> and <code>WASMLayout</code>.</p>
+<p>
+Update <code>WASMLayout</code> - <code>&lt;NavMenu IsWASM="true" /&gt;</code></p>
+<pre lang="c#">
+// Section to update parameter ISWASM is set to true - we don't need to change ServerLayout as default is false
+&lt;div class="sidebar"&gt;
+    &lt;NavMenu IsWASM="true" /&gt;
+&lt;/div&gt;
+</pre>
+
+<p>
+<code>MainLayout</code> is now redundant. &nbsp;Delete it.</p>
+<p>
+Update <i>Server.razor</i> replacing the default code with:</p>
+<pre lang="c#">
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+
+@namespace AllinOne.Shared.Components
+
+// We define the ViewManager Component with the home View and default Layout
+&lt;ViewManager DefaultViewData="this.viewData" DefaultLayout="typeof(ServerLayout)"&gt;
+&lt;/ViewManager&gt;
+
+@code {
+    public ViewData viewData = new ViewData(typeof(AllinOne.Shared.Components.Index), null);
+}
+</pre>
+
+<p>
+Update <i>WASM.razor</i> replacing the default code with:</p>
+<pre lang="c#">
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+
+@namespace AllinOne.Shared.Components
+
+// We define the ViewManager Component with the home View and default Layout
+// We use the WASMLayout which sets the NavMenu to the WASM version
+&lt;ViewManager DefaultViewData="this.viewData" DefaultLayout="typeof(WASMLayout)"&gt;
+&lt;/ViewManager&gt;
+
+@code {
+    public ViewData viewData = new ViewData(typeof(AllinOne.Shared.Components.Index), null);
+}
+</pre>
+
+<h2>
+Server Project Code</h2>
+<h3>
+Pages</h3>
+<p>
+Copy the following code into <i>_Host.cshtml</i> to <i>Pages</i> in the Server project. &nbsp; This is the home page for the Server SPA.</p>
+<pre lang="html">
+@page "/"
+@using AllinOne.Shared.Components
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+}
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="utf-8" /&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+    &lt;title&gt;Blazor-Server&lt;/title&gt;
+    &lt;base href="~/" /&gt;
+    &lt;link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" /&gt;
+    &lt;link href="css/app.css" rel="stylesheet" /&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;app&gt;
+        &lt;component type="typeof(AllinOne.Shared.Components.Server)" render-mode="ServerPrerendered" /&gt;
+    &lt;/app&gt;
+
+    &lt;div id="blazor-error-ui"&gt;
+        &lt;environment include="Staging,Production"&gt;
+            An error has occurred. &nbsp;This application may no longer respond until reloaded.
+        &lt;/environment&gt;
+        &lt;environment include="Development"&gt;
+            An unhandled exception has occurred. &nbsp;See browser dev tools for details.
+        &lt;/environment&gt;
+        &lt;a href="" class="reload"&gt;Reload&lt;/a&gt;
+        &lt;a class="dismiss"&gt;🗙&lt;/a&gt;
+    &lt;/div&gt;
+
+    &lt;script src="_framework/blazor.server.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<h3>
+Startup.cs</h3>
+<p>
+Update <i>Startup</i></p>
+<pre lang="c#">
+// add reference 
+using AllinOne.Shared.Data;
+
+
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddControllersWithViews();
+    services.AddRazorPages();
+    // Add Server Side Blazor services
+    services.AddServerSideBlazor();
+    // Add the server version of the weather dataservice
+    services.AddSingleton&lt;IWeatherForecastService, WeatherForecastService&gt;();
+}
+
+public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+{
+    if (env.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+        app.UseWebAssemblyDebugging();
+    }
+    else
+    {
+        app.UseExceptionHandler("/Error");
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseBlazorFrameworkFiles();
+    app.UseStaticFiles();
+
+    app.UseRouting();
+
+    app.UseEndpoints(endpoints =&gt;
+    {
+        // Add the Blazor Hub
+        endpoints.MapBlazorHub();
+        endpoints.MapRazorPages();
+        endpoints.MapControllers();
+        // Set the default endpoint to _Host.cshtml
+        endpoints.MapFallbackToPage("/_Host");
+        // endpoints.MapFallbackToFile("index.html");
+    });
+}
+</pre>
+
+<h2>
+Client Project Code</h2>
+<h3>
+Program.cs</h3>
+<p>
+Update <i>Program</i></p>
+<pre lang="c#">
+// add reference 
+using AllinOne.Shared.Data;
+
+public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        var builder = WebAssemblyHostBuilder.CreateDefault(args);
+        // Sets the component to substitute into "app". &nbsp;
+        builder.RootComponents.Add &lt; AllinOne.Shared.Components.WASM&gt;("app");
+
+        builder.Services.AddScoped(sp =&gt; new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+        // add the WASM version of the weather dataservice
+        builder.Services.AddScoped&lt;IWeatherForecastService, WeatherForecastWASMService&gt;();
+
+        await builder.Build().RunAsync();
+    }
+}
+</pre>
+
+<h2>
+Final Clean Up</h2>
+<p>
+Clean up the project files. &nbsp; Depending on how you moved the files around there may be some Folder/File artifacts left in the project files. &nbsp; Most are harmless, but some can cause build problems (duplicate names).</p>
+<p>
+An example of a harmless one:</p>
+<pre lang="xml">
+  &lt;ItemGroup&gt;
+    &lt;Folder Include="Components\ViewManager\" /&gt;
+  &lt;/ItemGroup&gt;
+</pre>
+
+<p>
+ <i>AllinOne.Client.csproj</i>.</p>
+<pre lang="xml">
+&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;netstandard2.1&lt;/TargetFramework&gt;
+    &lt;RazorLangVersion&gt;3.0&lt;/RazorLangVersion&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="3.2.1" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Build" Version="3.2.1" PrivateAssets="all" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="3.2.1" PrivateAssets="all" /&gt;
+    &lt;PackageReference Include="System.Net.Http.Json" Version="3.2.0" /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include="..\Shared\AllinOne.Shared.csproj" /&gt;
+  &lt;/ItemGroup&gt;
+
+&lt;/Project&gt;
+</pre>
+
+<p>
+ <i>AllinOne.Server.csproj</i>.</p>
+<pre lang="xml">
+&lt;&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;netcoreapp3.1&lt;/TargetFramework&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="3.2.1" /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include="..\Client\AllinOne.Client.csproj" /&gt;
+    &lt;ProjectReference Include="..\Shared\AllinOne.Shared.csproj" /&gt;
+  &lt;/ItemGroup&gt;
+
+
+&lt;/Project&gt;
+</pre>
+
+<p>
+ <i>AllinOne.Shared.csproj</i>.</p>
+<pre lang="xml">
+&lt;Project Sdk="Microsoft.NET.Sdk.Razor"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;netstandard2.1&lt;/TargetFramework&gt;
+    &lt;AssemblyName&gt;AllinOne.Shared&lt;/AssemblyName&gt;
+    &lt;RazorLangVersion&gt;3.0&lt;/RazorLangVersion&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="3.2.1" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="3.2.1" PrivateAssets="all" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.2.0" /&gt;
+    &lt;PackageReference Include="System.Net.Http.Json" Version="3.2.0" /&gt;
+  &lt;/ItemGroup&gt;
+
+&lt;/Project&gt;
+</pre>
+
+<h2>
+Build and run the Solution</h2>
+<p>
+That's it. &nbsp; If you've done everything perfectly, and I've got everything right, you'll be able to build and run the project. &nbsp; I've tested this set of instructions twice now, so I'm hoping I've not overlooked anything. &nbsp; Comment and call me stupid if I have! </p>
+<p>
+Your solution should look like this:</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/AllinOne/master/images/Final-Solution.png?raw=true" alt="final solution"></img></p>
+<p>
+Build errors will normally be because:</p>
+<ul start="-">
+<li>
+missing assembly references</li>
+<li>
+dirty project files</li>
+<li>
+Comments marked with // in razor files. &nbsp; They don't work in code but do in MD files (which is what this is written in).</li>
+</ul>
+
+<h2>
+Wrap Up</h2>
+<p>
+Hopefully I've demonstrated that it's possible to develop, build and host both Blazor WASM and Server SPA's within the same solution on the same web site. &nbsp; You do need to change your perspective on routing. &nbsp; It took me a while to be convinced, but it's now my normal development mode. &nbsp; An SPA is an application, not a web site.</p>
+<p>
+To summarize what we have done:</p>
+<ol start="1">
+<li>
+Moved ALL the project code into the <i>Shared</i> library. &nbsp;Look at the completed contents of the <i>Client</i> and <i>Server</i> projects.</li>
+<li>
+Created a data model that supports both Server and WASM data access.</li>
+<li>
+Converted the <i>Server</i> project to run both the API and the Blazor Server side of the application.</li>
+</ol>
+
+<p>
+The application starts in Server mode. &nbsp; Clicking on the switch button loads <i>wasm.html</i> which loads the WASM application. &nbsp; The seamless linking of the Client WASM objects into the Server site is handled by the <i>Microsoft.AspNetCore.Components.WebAssembly.Server</i> package.</p>
+<p>
+The project is a prototype demonstrator and a bit rough around the edges. &nbsp; It's not the polished ready to release article. &nbsp;</p>
+<p>
+Any problems with builds, post a comment at the end of this article - a link to a GitHub repo of your code would really help.</p>
+
+</body>
+</html>

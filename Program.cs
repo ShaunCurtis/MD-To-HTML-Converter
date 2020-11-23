@@ -25,7 +25,8 @@ namespace MD_To_HTML_Converter
         {
             Console.WriteLine("Markdown to HTML Coverter");
 
-            string workingdir = @"C:\Users\Shaun.Obsidian\source\repos\MD-To-HTML-Converter\MD";
+            string workingdir = $"{Directory.GetCurrentDirectory()}\\MD";
+            // string workingdir = @"C:\Users\Shaun.Obsidian\source\repos\MD-To-HTML-Converter\MD";
 
             //// Get the directory
             //var value = string.Empty;
