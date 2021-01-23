@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<link rel = "stylesheet" type = "text/css" href = "https://codeproject.freetls.fastly.net/App_Themes/CodeProject/Css/Main.css?dt=2.8.20201113.1" />
+<head>
+
+</head>
+<body>
+<h1>
+Exploring Blazor Component Rendering</h1>
+<blockquote>
+This article explores the Blazor Component update process with code that demonstrates what is, and isn't happening.</blockquote>
+
+<p>
+This article started life as some code I wrote to explore what I thought I already understood - the mechanics of Blazor Component Rendering.</p>
+<h2>
+Repo and Site</h2>
+<p>
+The code is available in the <a href="https://github.com/ShaunCurtis/AllinOne">AllinOne</a> Project on GitHub. &nbsp; The original project demonstrates how to combine Server and WASM under the same roof. &nbsp; You'll find the code in the Shared Project under <i>AllinOne.Shared &gt; Components &gt; Controls</i>, and the counter page <i>AllinOne.Shared &gt; Components &gt; Views &gt; Counter.razor</i>.</p>
+<p>
+The application is hosted on Azure at <a href="https://allinoneserver.azurewebsites.net/">https://allinoneserver.azurewebsites.net/</a>.</p>
+<h2>
+The Code</h2>
+<p>
+We're going to build a set of counter components that we can cascade in the <i>Counter</i> page.</p>
+<h4>
+Counter</h4>
+<p>
+First, we need is a basic <code>Counter</code> class we can run as a service. &nbsp; Note the <i>event</i> for when <code>Counter</code> is incremented.</p>
+<pre lang="c#">
+    public class CounterService
+    {
+        // The counter.
+        public int Counter { get; private set; } = 0;
+
+        // An event triggered when we increment the counter
+        public event EventHandler CounterChanged;
+
+        // The incrementer method. &nbsp; Triggers CounterChanged when called
+        public void IncrementCounter()
+        {
+            this.Counter++;
+            this.CounterChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+</pre>
+
+<p>
+Add it to <code>StartUp</code>(Server) or <code>Program</code>(WASM).</p>
+<pre lang="c#">
+// Server
+    public class Startup
+    {
+        ......
+        public void ConfigureServices(IServiceCollection services)
+        {
+            .....
+            services.AddSingleton&lt;CounterService&gt;();
+        }
+        .....
+    }
+
+// WASM
+public class Program
+    {
+        public static async Task Main(string[] args)
+        {
+            ....
+            builder.Services.AddSingleton&lt;CounterService&gt;();
+            ....
+        }
+    }
+</pre>
+
+<h4>
+BaseCounter</h4>
+<p>
+<code>BaseCounter</code> implements the basic counter component functionality.</p>
+<p>
+<img src="https://github.com/ShaunCurtis/AllinOne/blob/master/images/counter-example.png?raw=true" alt="example counter"></img></p>
+<p>
+A button with two badges and a label between them. &nbsp; The left badge displays the value in the local <code>counter</code> variable, the right badge the <code>CounterService.Counter</code> value. &nbsp; <code>OnParametersSetAsync</code> sets the local <code>counter</code> to <code>CounterService.Counter</code>. &nbsp; Counter is therefore only updated when <code>SetParametersAsync</code> is called on the component by the Render.</p>
+<pre lang="html">
+@namespace AllinOne.Shared.Components
+
+&lt;table class="border border-primary"&gt;
+    &lt;tr&gt;
+        &lt;td class="text-nowrap"&gt;
+            &lt;button type="button" class="btn @this.buttoncolor" @onclick="() =&gt; this.Service.IncrementCounter()"&gt;
+                &lt;span class="badge bg-light text-dark mx-1"&gt;@this.counter&lt;/span&gt;@this.Name &lt;span class="badge bg-dark text-white ml-1"&gt;@this.Service.Counter&lt;/span&gt;
+            &lt;/button&gt;
+        &lt;/td&gt;
+        @if (ChildContent != null)
+        {
+            &lt;td width="90%"&gt;
+                @ChildContent
+            &lt;/td&gt;
+        }
+        @if (Body != null)
+        {
+            &lt;td width="90%"&gt;
+                @Body
+            &lt;/td&gt;
+        }
+    &lt;/tr&gt;
+&lt;/table&gt;
+</pre>
+
+<pre lang="c#">
+@code {
+
+    [Inject] public CounterService Service { get; set; }
+
+    [Parameter] public RenderFragment ChildContent { get; set; }
+
+    [Parameter] public RenderFragment Body { get; set; }
+
+    [Parameter] public string Name { get; set; } = "Add";
+
+    protected virtual string buttonclass =&gt; (ChildContent != null || Body != null) ? "col-2" : "col";
+
+    protected virtual string buttoncolor =&gt; "btn-secondary";
+
+    protected virtual int counter { get; set; }
+
+    protected override Task OnParametersSetAsync()
+    {
+        counter = Service.Counter;
+        return Task.CompletedTask;
+    }
+
+}
+</pre>
+
+<h4>
+EventCounter</h4>
+<p>
+<code>EventCounter</code> inherits from <code>BaseCounter</code>. &nbsp; it adds registration of a local <code>ReRender</code> event handler with the service <code>CounterChanged</code> event. &nbsp; <code>ReRender</code> forces a UI Update through <code>StateHasChanged</code> whenever the counter is updated.</p>
+<pre lang="c#">
+@inherits BaseCounter
+
+// Markup the same as BaseCounter
+
+@code {
+
+    protected override string buttoncolor =&gt; "btn-success";
+
+    protected override Task OnInitializedAsync()
+    {
+        Service.CounterChanged += ReRender;
+        return base.OnInitializedAsync();
+    }
+
+    protected void ReRender(object sender, EventArgs e) =&gt; this.InvokeAsync(this.StateHasChanged);
+}
+</pre>
+
+<h4>
+CascadedValueCounter</h4>
+<p>
+<code>CascadedValueCounter</code> inherits from <code>BaseCounter</code>. &nbsp; It adds functionality to capture a cascaded <code>CascadedCounter</code> and sets the local <code>counter</code> to the captured value.</p>
+<pre lang="c#">
+@inherits BaseCounter
+
+// Markup the same as BaseCounter
+
+@code {
+
+    [CascadingParameter(Name ="CascadedCounter")] public int cascadedcounter { get; set; }
+
+    protected override string buttoncolor =&gt; "btn-danger";
+
+    protected override Task OnParametersSetAsync()
+    {
+        counter = cascadedcounter;
+        return Task.CompletedTask;
+    }
+}
+</pre>
+
+<h4>
+CascadedObjectCounter</h4>
+<p>
+<code>CascadedObjectCounter</code> inherits from <code>BaseCounter</code>. &nbsp; it adds functionality to capture a cascaded <code>CascadedService</code> and sets the local <code>counter</code> to the captured <code>CounterService.Counter</code>.</p>
+<pre lang="c#">
+@inherits BaseCounter
+
+// Markup the same as BaseCounter
+
+@code {
+
+    protected override string buttoncolor =&gt; "btn-warning";
+
+    [CascadingParameter(Name = "CascadedService")] public CounterService CascadedService { get; set; }
+
+    protected override Task OnParametersSetAsync()
+    {
+        counter = CascadedService?.Counter ?? 0;
+        return Task.CompletedTask;
+    }
+}
+</pre>
+
+<h3>
+Counter Page</h3>
+<p>
+The final bit is to build a new counter page with various different combinations of counter components in component trees. &nbsp; Note the root counter, the injected <code>CounterService</code> and cascading values. &nbsp; We've also labelled each component to make referencing easier. &nbsp;</p>
+<pre lang="html">
+&lt;h1&gt;Counter&lt;/h1&gt;
+
+&lt;table class="border border-primary"&gt;
+    &lt;tr&gt;
+        &lt;td class="text-nowrap"&gt;
+            &lt;button type="button" class="btn btn-primary" @onclick="() =&gt; this.Service.IncrementCounter()"&gt;
+                Root &lt;span class="badge bg-light text-dark"&gt;@this.counter&lt;/span&gt;&lt;span class="badge bg-dark text-white ml-1"&gt;@this.Service.Counter&lt;/span&gt;
+            &lt;/button&gt;
+        &lt;/td&gt;
+        &lt;td width="90%"&gt;
+            &lt;CascadingValue Name="CascadedService" Value="this.Service"&gt;
+                &lt;CascadingValue Name="CascadedCounter" Value="this.Service.Counter"&gt;
+
+                    &lt;BaseCounter Name="A"&gt;
+                        &lt;BaseCounter Name="A.A"&gt;
+                            &lt;BaseCounter Name="A.A.A"&gt;&lt;/BaseCounter&gt;
+                            &lt;BaseCounter Name="A.A.B"&gt;&lt;Body&gt;With Body Content&lt;/Body&gt;&lt;/BaseCounter&gt;
+                        &lt;/BaseCounter&gt;
+
+                        &lt;BaseCounter Name="A.B"&gt;
+                            &lt;BaseCounter Name="A.B.A"&gt;With Child Content&lt;/BaseCounter&gt;
+                            &lt;BaseCounter Name="A.B.B"&gt;&lt;/BaseCounter&gt;
+                            &lt;EventCounter Name="A.B.C"&gt;With Child Content&lt;/EventCounter&gt;
+                            &lt;EventCounter Name="A.B.D"&gt;&lt;/EventCounter&gt;
+                        &lt;/BaseCounter&gt;
+                    &lt;/BaseCounter&gt;
+
+                    &lt;BaseCounter Name="B"&gt;
+                        &lt;EventCounter Name="B.A"&gt;
+                            &lt;BaseCounter Name="B.A.A"&gt;With Child Content&lt;/BaseCounter&gt;
+                            &lt;BaseCounter Name="B.A.B"&gt;&lt;/BaseCounter&gt;
+                        &lt;/EventCounter&gt;
+                    &lt;/BaseCounter&gt;
+
+                    &lt;BaseCounter Name="C"&gt;
+                        &lt;EventCounter Name="C.A"&gt;
+                            &lt;BaseCounter Name="C.A.A"&gt;&lt;/BaseCounter&gt;
+                        &lt;/EventCounter&gt;
+                    &lt;/BaseCounter&gt;
+
+                    &lt;EventCounter Name="D"&gt;
+                        &lt;BaseCounter Name="D.A"&gt;has content&lt;/BaseCounter&gt;
+                    &lt;/EventCounter&gt;
+
+                    &lt;BaseCounter Name="E"&gt;
+                        &lt;BaseCounter Name="E.A"&gt;
+                            &lt;CascadedObjectCounter Name="E.A.A"&gt;With Child Content&lt;/CascadedObjectCounter&gt;
+                            &lt;CascadedObjectCounter Name="E.A.B"&gt;&lt;/CascadedObjectCounter&gt;
+                            &lt;CascadedValueCounter Name="E.A.C"&gt;With Child Content&lt;/CascadedValueCounter&gt;
+                            &lt;CascadedValueCounter Name="E.A.D"&gt;&lt;/CascadedValueCounter&gt;
+                        &lt;/BaseCounter&gt;
+
+                        &lt;EventCounter Name="E.B"&gt;
+                            &lt;CascadedValueCounter Name="E.B.A"&gt;With Child Content&lt;/CascadedValueCounter&gt;
+                            &lt;CascadedValueCounter Name="E.B.B"&gt;&lt;/CascadedValueCounter&gt;
+                            &lt;CascadedObjectCounter Name="E.B.C"&gt;With Child Content&lt;/CascadedObjectCounter&gt;
+                            &lt;CascadedObjectCounter Name="E.B.D"&gt;&lt;/CascadedObjectCounter&gt;
+                        &lt;/EventCounter&gt;
+                    &lt;/BaseCounter&gt;
+
+                &lt;/CascadingValue&gt;
+            &lt;/CascadingValue&gt;
+        &lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;
+</pre>
+
+<pre lang="c#">
+@code {
+
+    [Inject] public CounterService Service { get; set; }
+
+    protected virtual int counter { get; set; }
+
+    protected override Task OnParametersSetAsync()
+    {
+        counter = Service.Counter;
+        return Task.CompletedTask;
+    }
+
+}
+</pre>
+
+<h2>
+What's going on?</h2>
+<p>
+Go to <a href="https://allinoneserver.azurewebsites.net/?view=AllinOne.Shared.Components.Counter">allinoneserver.azurewebsites.net</a> to see the page in action.</p>
+<p>
+The left value is the value of the local <code>counter</code> variable. &nbsp; If it's not the current value then <code>SetParametersAsync</code> wasn't called on the component at the last event (normally a button click).</p>
+<p>
+The right value displays the current <code>CounterService.Counter</code>. &nbsp; If it's up to date then the component was re-rendered through <code>StateHasChanged</code> at the last event. &nbsp; If not, then it wasn't.</p>
+<ul start="-">
+<li>
+<strong>Blue</strong> is the Root Counter (a BaseCounter)</li>
+<li>
+<strong>Grey</strong> are BaseCounters</li>
+<li>
+<strong>Green</strong> are EventCounters</li>
+<li>
+<strong>Amber</strong> are CascadedObjectCounters</li>
+<li>
+<strong>Red</strong> are CascadedValueCounters</li>
+<li>
+<strong>With Child Content</strong> are counters with content in <code>ChildContent</code></li>
+<li>
+<strong>With Body Content</strong> are counters with content in <code>Body</code></li>
+</ul>
+
+<p>
+Let's look at some scenarios:</p>
+<h4>
+Click Root</h4>
+<p>
+Most of the children update. &nbsp; The event has caused a cascaded <code>SetParametersAsync</code> on child components. &nbsp; For example, <strong>A.A</strong> has the both values set to the current value, so <code>SetParametersAsync</code> has been called. &nbsp; Note <code>SetParametersAsync</code> calls <code>StateHasChanged</code> automatically.</p>
+<p>
+However, <strong>A.A.A</strong> didn't update. &nbsp; Unlike <strong>A.A.B</strong> it has no child content. &nbsp; You can see this elsewhere - <strong>B.A.B</strong> and <strong>C.A.A</strong> for example.</p>
+<p>
+<img src="https://github.com/ShaunCurtis/AllinOne/blob/master/images/counter-root.png?raw=true" alt="Root"></img></p>
+<h4>
+Click A</h4>
+<p>
+We now see just some are updated. &nbsp; <strong>A</strong> has updated, but only the second value. &nbsp;The button click initiated a call to <code>StateHasChanged</code> automatically causing a component render, but <code>SetParametersAsync</code> wasn't called. &nbsp; The child components have reacted in the same way as a root click - only components with child content have updated.</p>
+<p>
+The green counters have all updated -  for example <strong>A.B.C</strong> and <strong>A.B.D</strong> - regardless of whether they have child content or not. &nbsp; Direct dependents of <strong>A</strong> with child content have had <code>SetParametersAsync</code> run, those without child content, or not descendants haven't. &nbsp; They have rendered through their event handlers wired into the <code>CounterService.CounterChanged</code> event. &nbsp; Note also that any children of EventCounters - <strong>B.B.A</strong> for example - with child content have also updated.</p>
+<p>
+<img src="https://github.com/ShaunCurtis/AllinOne/blob/master/images/counter-A.png?raw=true" alt="A"></img></p>
+<h4>
+Click E</h4>
+<p>
+Notice that the yellow and red Cascaded Counters with content have updated, but not the ones without content. &nbsp; Also note that on yellow CascadedObject Counters both values are current, while on the red CascadedValue Counters the left side values haven't updated. &nbsp; <code>SetParametersAsync</code> has run, but the cascaded value hasn't been updated. &nbsp; It's a primitive so only set when the page loads or Root is clicked. &nbsp; The object cascade is a pointer to the object which is update to date.</p>
+<p>
+<img src="https://github.com/ShaunCurtis/AllinOne/blob/master/images/counter-E.png?raw=true" alt="E"></img></p>
+<h4>
+New Browser Window</h4>
+<p>
+Open a new browser Window on the same page. &nbsp; Put the two side by side. &nbsp; Click anywhere on one.</p>
+<p>
+What happens depends on whether you're running in Server or WASM mode. &nbsp; In Server mode, all the green counters (and children with content) get updated in the other window. &nbsp; In WASM nothing happens. &nbsp; In Server mode, <code>CounterService</code> is running as a singleton, with all copies of the application using the same object, and thus wired to the same event. &nbsp; In WASM mode, there's no such thing as a Singleton - they run as scoped.</p>
+<h2>
+Conclusions</h2>
+<p>
+I could sit here and try to define a set of coding rules to cover the various scenarios. &nbsp; But.., why attempt jumping through hoops when the kitchen sink approach - service events - just works.</p>
+<p>
+My recommendation is simple, use service events.</p>
+
+</body>
+</html>
