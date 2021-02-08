@@ -10,8 +10,13 @@ This set of articles looks at how to build and structure a real Database Applica
 5. [View Components - CRUD List Operations in the UI](https://www.codeproject.com/Articles/5280391/Building-a-Database-Application-in-Blazor-Part-5-V)
 6. [A walk through detailing how to add weather stations and weather station data to the application](https://www.codeproject.com/Articles/5281000/Building-a-Database-Application-in-Blazor-Part-6-A)
 
-They document my current framework for developing Blazor Applications.
-
+The articles, which describe my current framework for developing Blazor applications, have been revised from their original release:
+1. The libraries have significant coding updates, particularly in the Data Services.
+2. Everything has been update to Net5.
+3. The Repo home has moved.
+4. Some core functionality had moved into libraries available though publically available Nuget packages.
+5. Combined Server and WASM applications on the same site.
+   
 They are not:
 1. An attempt to define best practice.
 2. The finished product.
@@ -24,7 +29,7 @@ This first section describes my somewhat radical development approach and walks 
 
 ## Repository and Database
 
-[CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor)
+The repository for the articles has move to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
 
 There's a SQL script in /SQL in the repository for building the database.
 
@@ -36,15 +41,17 @@ There's a SQL script in /SQL in the repository for building the database.
 
 I use Visual Studio, so the Github repository consists of a solution with five projects.  These are:
 
-1. CEC.Blazor - the core library containing everything that can be boilerplated and reused across any project.
+1. CEC.Blazor.SPA - the core library containing everything that can be boilerplated and reused across any project.
 2. CEC.Weather - this is the library shared by both the Server and WASM projests.  Almost all the project code lives here.  Examples are the EF DB Context, Model classes, model specific CRUD components, Bootstrap SCSS, Views, Forms, ...
-3. CEC.Blazor.Server - the Server project.
-4. CEC.Blazor.WASM.Server - the WASM backend server project.  The API Controllers with supporting code.
+3. CEC.Blazor.Server - the combined Server/WASM project.
+4. CEC.Blazor.WASM.Server - the WASM backend server project.  Used for testing/debugging the WASM code.
 5. CEC.Blazor.WASM.Client - the WASM Client project.
+
+Along with the standard Nuget libraries, the solution uses *CEC.Blazor.Core* which contains the ViewManager and core View management classes.
 
 ## Design Philosophy
 
-The data side of the project is structured fairly conventionally, loosely based on the three tier - data, logical and presentation layer - model.  The exposed data classes all run as Services and are available for dependency injection.  The detail is covered in the second article.
+The data side of the project is structured fairly conventionally, loosely based on the three tier - data, logical and presentation layer - model.  The exposed data classes all run as Services and are available for dependency injection.  I have adopted a record based approach to the data.  Data read from the database is immutable.  Editing uses derived edit data classes that produce new records thet are written back to the database.   The detail is covered in the second and third articles.
 
 The UI is more radical:
 
@@ -92,53 +99,7 @@ Controls are components that display something: they emit HTML code.  For exampl
 
 ![Project Files](https://github.com/ShaunCurtis/CEC-Publish/blob/master/Images/CEC.Blazor.WASM.Client-2.png?raw=true)
 
-The project is almost empty.  The controls and services are all in the libraries.
-
-### index.html
-
-`index.html` is almost standard issue with:
-
-1. Added stylesheet references.  Note that you use the virtual directory `_content/Assembly_Name` to access content exposed in the `wwwroot` folders of dependency assembles.  Scripts are accessed in the same way.
-2. The base content of `app` is an HTML block that displays a spinner while the application is initializing. 
-
-![App Start Screen](https://github.com/ShaunCurtis/CEC-Publish/blob/master/Images/WASM-Start-Screen.png?raw=true)
-
-```html
-<!DOCTYPE html>
-<html>
-
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>CEC.Blazor.WASM</title>
-    <base href="/" />
-    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
-    <link rel="stylesheet" href="_content/CEC.Blazor/cec.blazor.min.css" />
-    <link  rel="stylesheet" href="_content/CEC.Weather/css/site.min.css" />
-</head>
-
-<body>
-    <app>
-        <div class="mt-4" style="margin-right:auto; margin-left:auto; width:100%;" >
-            <div class="loader"></div>
-            <div style="width:100%; text-align:center;"><h4>Web Application Loading</h4></div>
-        </div>
-    </app>
-
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="" class="reload">Reload</a>
-        <a class="dismiss">🗙</a>
-    </div>
-    <script src="_framework/blazor.webassembly.js"></script>
-    <script src="_content/CEC.Blazor/site.js"></script>
-</body>
-
-</html>
-```
-### CSS
-
-All CSS is shared, so lives in `CEC.Weather`.  I use Bootstrap, customized a little with SASS.  I have the WEB COMPILER extension installed in Visual Studio to compile SASS files on the fly.
+The project is almost empty.  The controls and services are all in the libraries.  It contains only the code needed to build the WASM executable.
 
 ### Program.cs
 
@@ -154,7 +115,7 @@ public static async Task Main(string[] args)
     // Added here as we don't have access to builder in AddApplicationServices
     builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
     // the Services for the CEC.Blazor Library
-    builder.Services.AddCECBlazor();
+    builder.Services.AddCECBlazorSPA();
     // the local application Services defined in ServiceCollectionExtensions.cs
     builder.Services.AddApplicationServices();
 
@@ -172,12 +133,12 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
-        // Scoped service for the WASM Client version of WeatherForecast Data Service 
-        services.AddScoped<IWeatherForecastDataService, WeatherForecastWASMDataService>();
-        // Scoped service for the WeatherForecast Controller Service
+        // Scoped service for the WASM Client version of WASM Factory Data Service 
+        services.AddScoped<IFactoryDataService<WeatherForecastDbContext>, FactoryWASMDataService<WeatherForecastDbContext>>();
+        // Scoped service for the WeatherForecast Controller Services
         services.AddScoped<WeatherForecastControllerService>();
-        // Transient service for the Fluent Validator for the WeatherForecast record
-        services.AddTransient<IValidator<DbWeatherForecast>, WeatherForecastValidator>();
+        services.AddScoped<WeatherStationControllerService>();
+        services.AddScoped<WeatherReportControllerService>();
         return services;
     }
 }
@@ -185,57 +146,11 @@ public static class ServiceCollectionExtensions
 
 ### CEC.Blazor.WASM.Server Project
 
-![Project Files](https://github.com/ShaunCurtis/CEC-Publish/blob/master/Images/CEC.Blazor.WASM.Server-2.png?raw=true)
+The *CEC.Blazor.WASM.Server* project only exists for debugging the WASM project.  All files are copies of the originals from *CEC.Blazor.Server*.
+
+![Project Files](https://github.com/ShaunCurtis/CEC.Blazor.SPA/blob/master/Images/CEC-Blazor-SPA-WASM-Server-Project-View.png?raw=true)
 
 The only files in the server project, other than error handling for anyone trying to navigate to the site, are the WeatherForecast Controller and the startup/program files.
-
-#### WeatherForecastController.cs
-
-This is a standard API type controller.  It uses the registered `IWeatherForecastDataService` as it's data layer making async calls through the `IWeatherForecastDataService` interface.
-
-```c#
-    [ApiController]
-    public class WeatherForecastController : ControllerBase
-    {
-        protected IWeatherForecastDataService DataService { get; set; }
-
-        private readonly ILogger<WeatherForecastController> logger;
-
-        public WeatherForecastController(ILogger<WeatherForecastController> logger, IWeatherForecastDataService weatherForecastDataService)
-        {
-            this.DataService = weatherForecastDataService;
-            this.logger = logger;
-        }
-
-        [MVC.Route("weatherforecast/list")]
-        [HttpGet]
-        public async Task<List<DbWeatherForecast>> GetList() => await DataService.GetRecordListAsync();
-
-        [MVC.Route("weatherforecast/count")]
-        [HttpGet]
-        public async Task<int> Count() => await DataService.GetRecordListCountAsync();
-
-        [MVC.Route("weatherforecast/get")]
-        [HttpGet]
-        public async Task<DbWeatherForecast> GetRec(int id) => await DataService.GetRecordAsync(id);
-
-        [MVC.Route("weatherforecast/read")]
-        [HttpPost]
-        public async Task<DbWeatherForecast> Read([FromBody]int id) => await DataService.GetRecordAsync(id);
-
-        [MVC.Route("weatherforecast/update")]
-        [HttpPost]
-        public async Task<DbTaskResult> Update([FromBody]DbWeatherForecast record) => await DataService.UpdateRecordAsync(record);
-
-        [MVC.Route("weatherforecast/create")]
-        [HttpPost]
-        public async Task<DbTaskResult> Create([FromBody]DbWeatherForecast record) => await DataService.CreateRecordAsync(record);
-
-        [MVC.Route("weatherforecast/delete")]
-        [HttpPost]
-        public async Task<DbTaskResult> Delete([FromBody] DbWeatherForecast record) => await DataService.DeleteRecordAsync(record);
-    }
-```
 
 #### ServiceCollectionExtensions.cs
 
@@ -247,8 +162,9 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         // You have a choice of data sources.
-        // services.AddSingleton<IWeatherForecastDataService, WeatherForecastServerDataService>();
-        services.AddSingleton<IWeatherForecastDataService, WeatherForecastDummyDataService>();
+        // services.AddSingleton<IFactoryDataService<WeatherForecastDbContext>, FactoryServerDataService<WeatherForecastDbContext>>();
+        services.AddSingleton<IFactoryDataService<WeatherForecastDbContext>, WeatherDummyDataService>();
+
         // Factory for building the DBContext 
         var dbContext = configuration.GetValue<string>("Configuration:DBContext");
         services.AddDbContextFactory<WeatherForecastDbContext>(options => options.UseSqlServer(dbContext), ServiceLifetime.Singleton);
@@ -257,16 +173,103 @@ public static class ServiceCollectionExtensions
 }
 ```
 
+#### Startup.cs
+
+Note that the default endpoint is set to *wwwroot/wasm.html*.
+
+```c#
+public void ConfigureServices(IServiceCollection services)
+{
+
+    services.AddControllersWithViews();
+    services.AddRazorPages();
+    services.AddApplicationServices(Configuration);
+}
+
+// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+{
+    if (env.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+        app.UseWebAssemblyDebugging();
+    }
+    else
+    {
+        app.UseExceptionHandler("/Error");
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseBlazorFrameworkFiles();
+    app.UseStaticFiles();
+
+    app.UseRouting();
+
+    app.UseEndpoints(endpoints =>
+    {
+        endpoints.MapRazorPages();
+        endpoints.MapControllers();
+        // default endpoint set to the file: wwwroot/wasm.html
+        endpoints.MapFallbackToFile("wasm.html");
+    });
+}
+```
+### wasm.html
+
+`wasm.html` is an almost out-of-the-box  `index.html` with:
+
+1. Added stylesheet references.  Note that you use the virtual directory `_content/Assembly_Name` to access content exposed in the `wwwroot` folders of dependency assembles and the reference to the component styling - `CEC.Weather.WASM.Server.styles.css`.  Scripts are accessed in the same way.
+2. The base content of `app` is an HTML block that displays a spinner while the application is initializing. 
+
+![App Start Screen](https://github.com/ShaunCurtis/CEC.Blazor.SPA/blob/master/Images/WASM-Start-Screen.png?raw=true)
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>CEC.Blazor.WASM</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+    <link rel="stylesheet" href="CEC.Weather.WASM.Server.styles.css" />
+    <link rel="stylesheet" href="_content/CEC.Blazor.SPA/site.min.css" />
+    <link rel="stylesheet" href="_content/CEC.Weather/css/site.min.css" />
+</head>
+
+<body>
+    <div id="app">
+        <div class="mt-4" style="margin-right:auto; margin-left:auto; width:100%;">
+            <div class="loader"></div>
+            <div style="width:100%; text-align:center;"><h4>Web Application Loading</h4></div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/CEC.Blazor.SPA/site.js"></script>
+</body>
+
+</html>
+```
+### CSS
+
+All CSS is shared, so lives in `CEC.Weather`.  I use Bootstrap, customized a little with SASS.  I have the WEB COMPILER extension installed in Visual Studio to compile SASS files on the fly.
+
 ### CEC.Blazor.Server Project
 
-![Project Files](https://github.com/ShaunCurtis/CEC-Publish/blob/master/Images/CEC.Blazor.Server-2.png?raw=true)
-
-This project is almost identical to `CEC.Blazor.WASM.Client`.
+![Project Files](https://github.com/ShaunCurtis/CEC.Blazor.SPA/blob/master/Images/CEC-Weather-Server-Project-View.png?raw=true)
 
 #### Pages
 
 We have one real page - the standard issue `_Host.cshtml`.  As we're running on the server this is an asp.netcore page.
-1. Added stylesheet references.  Note that you use the virtual directory `_content/Assembly_Name` to access content exposed in the `wwwroot` folders of dependency assembles.  Scripts are accessed in the same way.
+1. Added stylesheet references.  Note that you use the virtual directory `_content/Assembly_Name` to access content exposed in the `wwwroot` folders of dependency assembles and the reference to the component styling - `CEC.Weather.WASM.Server.styles.css`..  Scripts are accessed in the same way.
 2. The base content of `app` uses a TagHelper to load the root component - in this case `CEC.Weather.Components.App`.  Again, you're not tied to App, just specify a different component class. 
 
 ```c#
@@ -285,6 +288,7 @@ We have one real page - the standard issue `_Host.cshtml`.  As we're running on 
     <title>CEC.Blazor.Server</title>
     <base href="~/" />
     <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+    <link rel="stylesheet" href="CEC.Weather.Server.styles.css" />
     <link rel="stylesheet" href="_content/CEC.Blazor/cec.blazor.min.css" />
     <link rel="stylesheet" href="_content/CEC.Weather/css/site.min.css" />
 </head>
@@ -308,6 +312,9 @@ We have one real page - the standard issue `_Host.cshtml`.  As we're running on 
 </body>
 </html>
 ```
+### wasm.html
+
+`wasm.html` is a copy of `wasm.html` from the *CEC.Weather.WASM.Server*.  It's the entry point for the WASM version of the application.
 
 #### Startup.cs
 
@@ -316,10 +323,38 @@ The local services and `CEC.Blazor` library services are added.
 ```c#
 public void ConfigureServices(IServiceCollection services)
 {
+    services.AddControllersWithViews();
     services.AddRazorPages();
     services.AddServerSideBlazor();
-    services.AddCECBlazor();
+    services.AddCECBlazorSPA();
     services.AddApplicationServices();
+}
+
+public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+{
+    if (env.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler("/Error");
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseBlazorFrameworkFiles();
+    app.UseStaticFiles();
+
+    app.UseRouting();
+
+    app.UseEndpoints(endpoints =>
+    {
+        endpoints.MapBlazorHub();
+        endpoints.MapRazorPages();
+        endpoints.MapControllers();
+        endpoints.MapFallbackToPage("/_Host");
+    });
 }
 ```
 
@@ -330,10 +365,14 @@ The site specific services are a singleton `IWeatherForecastDataService` interfa
 ```c#
 public static IServiceCollection AddApplicationServices(this IServiceCollection services)
 {
-    //services.AddSingleton<IWeatherForecastDataService, WeatherForecastServerDataService>();
-    services.AddSingleton<IWeatherForecastDataService, WeatherForecastDummyDataService>();
+    services.AddSingleton<IFactoryDataService<WeatherForecastDbContext>, WeatherDummyDataService>();
+    // services.AddSingleton<IFactoryDataService<WeatherForecastDbContext>, FactoryServerDataService<WeatherForecastDbContext>>();
     services.AddScoped<WeatherForecastControllerService>();
-    services.AddTransient<IValidator<DbWeatherForecast>, WeatherForecastValidator>();
+    services.AddScoped<WeatherStationControllerService>();
+    services.AddScoped<WeatherReportControllerService>();
+    // Factory for building the DBContext 
+    var dbContext = configuration.GetValue<string>("Configuration:DBContext");
+    services.AddDbContextFactory<WeatherForecastDbContext>(options => options.UseSqlServer(dbContext), ServiceLifetime.Singleton);
     return services;
 }
 ```
@@ -349,4 +388,5 @@ Some key points to note:
 
 * 15-Sep-2020: Initial version
 * 17-Nov-2020: Major Blazor.CEC library changes.  Change to ViewManager from Router and new Component base implementation.
+* 7-Feb-2021: Major updates to Services, project structure and daa editing
 

@@ -17,24 +17,23 @@ You'll need a DotNetCore compatible development environment, normally either eit
 <h2>
 Code Repository</h2>
 <p>
-The code in available in a GitHub Repo <a href="https://github.com/ShaunCurtis/Async-Demo">here</a>. &nbsp; The code for this project is in <i>Async-Demo</i>. &nbsp;<i>AsyncDemoLibrary</i> contains some core library files we use. &nbsp; <i>AsyncChores</i> is the working project for the next article in this series.</p>
+The code in available in a GitHub Repo <a href="https://github.com/ShaunCurtis/Async-Demo">here</a>. &nbsp; The code for this project is in <i>Async-Demo</i>. &nbsp; Ignore any other projects - they are for a further Async Programming article.</p>
 <h2>
 Library Classes</h2>
 <p>
-Before we start I need to introduce the <code>LongRunningTasks</code> class.</p>
-<p>
-It contains code for emulating work.</p>
+Before we start your need to be aware of two helper classses</p>
 <ol start="1">
+<li>
+<code>LongRunningTasks</code> - emulates work.</li>
 <li>
 <code>RunLongProcessorTaskAsync</code> and <code>RunLongProcessorTask</code> use prime number calculations to emulate a processor heavy task.</li>
 <li>
 <code>RunYieldingLongProcessorTaskAsync</code> is a version that yields every 100 calculations.</li>
 <li>
 <code>RunLongIOTaskAsync</code> uses <code>Task.Delay</code> to emulate a slow I/O operations.</li>
+<li>
+<code>UILogger</code> provides an abstraction layer for logging information to the UI. &nbsp; You pass a delegate <code>Action</code> to the methods. &nbsp; <code>UILogger</code> builds the message, and then calls the <code>Action</code> to actually write it to wherever the <code>Action</code> is configured to write to. &nbsp;In our case <code>LogToConsole</code> in <code>Program</code>,  which runs <code>Console.WriteLine</code>. &nbsp; It could just as easily write to a text file.</li>
 </ol>
-
-<blockquote>
-The rest of the library files are part of the next article.</blockquote>
 
 <h2>
 Getting Started</h2>
@@ -256,50 +255,50 @@ To quote MS "Represents the producer side of a Task\&lt;TResult\&gt; unbound to 
 <p>
 The <code>Task</code> that represents the state of the <code>JobRunner</code> is exposed as the <code>JobTask</code> property. &nbsp; If the underlying <code>TaskCompletionSource</code> isn't set it returns a simple <code>Task.CompletedTask</code> object, otherwise it returns the <code>Task</code> of <code>JobTaskController</code>. &nbsp; The <code>Run</code> method uses the async event pattern - we need a block of code that runs asynchronously, yielding control with <code>await</code>. &nbsp; <code>Run</code> controls the <code>Task</code> state, but the <code>Task</code> itself is independant of <code>Run</code>. &nbsp; <code>IsRunning</code> ensures you can't start the job once it's running.</p>
 <pre lang="c#">
-    class JobRunner
+class JobRunner
+{
+    public enum JobType { IO, Processor, YieldingProcessor } 
+
+    public JobRunner(string name, int secs, JobType type = JobType.IO)
     {
-        public enum JobType { IO, Processor, YieldingProcessor } 
+        this.Name = name;
+        this.Seconds = secs;
+        this.Type = type;
+    }
 
-        public JobRunner(string name, int secs, JobType type = JobType.IO)
-        {
-            this.Name = name;
-            this.Seconds = secs;
-            this.Type = type;
-        }
+    public string Name { get; private set; }
+    public int Seconds { get; private set; }
+    public JobType Type { get; set; }
+    private bool IsRunning;
 
-        public string Name { get; private set; }
-        public int Seconds { get; private set; }
-        public JobType Type { get; set; }
-        private bool IsRunning;
+    public Task JobTask =&gt; this.JobTaskController == null ? Task.CompletedTask : this.JobTaskController.Task;
+    private TaskCompletionSource JobTaskController { get; set; } = new TaskCompletionSource();
 
-        public Task JobTask =&gt; this.JobTaskController == null ? Task.CompletedTask : this.JobTaskController.Task;
-        private TaskCompletionSource JobTaskController { get; set; } = new TaskCompletionSource();
-
-        public async void Run()
-        {
-            if (!this.IsRunning) {
-                this.IsRunning = true;
-                this.JobTaskController = new TaskCompletionSource();
-                switch (this.Type)
-                {
-                    case JobType.Processor:
-                        await LongRunningTasks.RunLongProcessorTaskAsync(Seconds, Program.LogToConsole, Name);
-                        break;
+    public async void Run()
+    {
+        if (!this.IsRunning) {
+            this.IsRunning = true;
+            this.JobTaskController = new TaskCompletionSource();
+            switch (this.Type)
+            {
+                case JobType.Processor:
+                    await LongRunningTasks.RunLongProcessorTaskAsync(Seconds, Program.LogToConsole, Name);
+                    break;
                     
-                    case JobType.YieldingProcessor:
-                        await LongRunningTasks.RunYieldingLongProcessorTaskAsync(Seconds, Program.LogToConsole, Name);
-                        break;
+                case JobType.YieldingProcessor:
+                    await LongRunningTasks.RunYieldingLongProcessorTaskAsync(Seconds, Program.LogToConsole, Name);
+                    break;
 
-                    default:
-                        await LongRunningTasks.RunLongIOTaskAsync(Seconds, Program.LogToConsole, Name);
-                        break;
-                }
-
-                this.JobTaskController.TrySetResult();
-                this.IsRunning = false;
+                default:
+                    await LongRunningTasks.RunLongIOTaskAsync(Seconds, Program.LogToConsole, Name);
+                    break;
             }
+
+            this.JobTaskController.TrySetResult();
+            this.IsRunning = false;
         }
     }
+}
 </pre>
 
 <h3>
