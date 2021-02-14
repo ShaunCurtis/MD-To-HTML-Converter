@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html>
+<link rel = "stylesheet" type = "text/css" href = "https://codeproject.freetls.fastly.net/App_Themes/CodeProject/Css/Main.css?dt=2.8.20201113.1" />
+<head>
+
+</head>
+<body>
+<h1>
+The Modal Editor</h1>
+<p>
+To set the context of this article, there have been many discussions, articles and proposals since Blazor was first released on how to handle edit forms. &nbsp; Specifically how to stop, or at least warn, the user when leaving a dirty form. &nbsp; The problem is not specific to Blazor: all Single Page Applications and Web Sites have the same challenges.</p>
+<p>
+In a classic web form, every navigation is a get or a post back to the server. &nbsp;We can use the inbuilt <code>window.beforeunload</code> event to warn a user that they have unsaved data on the page. &nbsp; Not great, but at least something - we'll be using it later. &nbsp; This technique falls flat in SPA's. &nbsp; What looks to the outsider like a navigation event isn't. &nbsp; The <code>NavigationManager</code> intercepts any navigation attempt from the page, triggers it's own <code>LocationChanged</code> event and sinks the request. &nbsp; The <code>Router</code>, wired into this event, does it's wizardry, and loads the new component set into the page. &nbsp; No real browser navigation takes place, so there's nothing for the browser's <code>beforeunload</code> event to catch.</p>
+<p>
+It's up to the programmer to write code that stops a user moving away from a dirty form. &nbsp; That's easier said than done when your application depends on the URL navigation pretext. &nbsp; Toolbars, navigation side bars and many buttons submit URLs to navigate around the application. &nbsp; Think of the out-of-the-box Blazor template. &nbsp; There's all the links in the left navigation, about in the top bar,.... &nbsp; </p>
+<p>
+Personally I have a serious issue with the whole routing charade: an SPA is an application, not a website, but I think I must be a minority of one!  This article is for the majority.</p>
+<p>
+All the NetCore 3.1 solutions I've come across were cludges in one shape or another, I've created more that one myself. &nbsp; What the community hoped for were changes in NetCore 5, specifically some extra functionality in <code>NavigationManager</code> to cancel or block navigation requests. &nbsp; That didn't happen: I don't think there was team concensus on the right solution, so we're back to square one.</p>
+<p>
+What I cover in this article is my latest approach to the problem. &nbsp; It's not perfect, but I don't think we will ever get a near perfect solution until we get some new browser standards allowing a switch to <i>SPA</i> mode and control over toolbar navigation.</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/CEC.Blazor.Editor/master/images/Dirty-Dialog.png?token=AF6NT3LJWA6SOY4PXWNGWHLAEPYC4" alt="Dirty Page"></img></p>
+<h2>
+Controlling SPA Navigation</h2>
+<p>
+The first challenge - How do you stop the user accessing any of the button/links navigation stuff on a standard page?</p>
+<ol start="1">
+<li>
+Build a custom <code>NavigationManager</code>. &nbsp; Not a bad idea, but that's a core bit of Blazor infrastructure with many knock on consequences. &nbsp; I'm steering clear.</li>
+<li>
+Build a custom <code>Router</code>. &nbsp; Also not a bad idea. &nbsp; I've done this, there's a released package on Nuget, a Github Repo and an article on this site. &nbsp; It's still a cludge with some issues that I want to get away from.</li>
+<li>
+Build a navigation component that you use throughout your application for <strong>ALL</strong> navigation. &nbsp; Also not a bad idea, but needs rigorous disipline to enforce in any team environment. &nbsp; One deviation and BANG!</li>
+<li>
+Use a Modal Dialog, locking out the rest of the form. &nbsp; My prefered option and the one I'll explore and develop here.</li>
+</ol>
+
+<p>NOTE - Most of the code here is <strong>Experimental</strong> - definitely not production ready. &nbsp;There's almost no error checking, blah, blah,... &nbsp; It's miminalist to try and preserve clarity.</p>
+
+<h2>Code Repository</h2>
+
+<p>The code is availabel here at <a href="https://github.com/ShaunCurtis/CEC.Blazor.Editor">CEC.Blazor.Editor on Github</a></p>
+
+<h2>
+Building the Dialog</h2>
+<p>
+First we build a basic modal dialog. &nbsp; This is CSS framework agnostic. &nbsp;You're welcome to adopt it to fit with Bootstrap et al.</p>
+<h3>
+ModalDialog1</h3>
+<p>
+Add a razor component to <i>Shared</i> with a code behind file called <code>ModalDialog1</code>. &nbsp;Add the following code. &nbsp; It's a pretend editor for a weather forecast.</p>
+<blockquote>
+Yes, It's Bootstrap before someone hangs me out to dry for the statement above!</blockquote>
+
+<pre lang="html">
+@if (this.Display)
+{
+    &lt;div class="modal-background"&gt;
+        &lt;div class="modal-content"&gt;
+            &lt;div class="container-fluid"&gt;
+                &lt;div class="row"&gt;
+                    &lt;div class="col"&gt;
+                        Date
+                    &lt;/div&gt;
+                    &lt;div class="col"&gt;
+                        @DateTime.Now.ToLongDateString();
+                    &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class="row"&gt;
+                    &lt;div class="col"&gt;
+                        Temperature C
+                    &lt;/div&gt;
+                    &lt;div class="col"&gt;
+                        0 deg C
+                    &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class="row"&gt;
+                    &lt;div class="col"&gt;
+                        Temperature C
+                    &lt;/div&gt;
+                    &lt;div class="col"&gt;
+                        32 deg F
+                    &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class="row"&gt;
+                    &lt;div class="col"&gt;
+                        Summary
+                    &lt;/div&gt;
+                    &lt;div class="col"&gt;
+                        Another Beast-from-the-East day
+                    &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class="row"&gt;
+                    &lt;div class="col-12 text-right"&gt;
+                        &lt;button class="btn btn-secondary" @onclick="() =&gt; Hide()"&gt;Close&lt;/button&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+}
+</pre>
+
+<pre lang="c#">
+using Microsoft.AspNetCore.Components;
+
+namespace CEC.Blazor.Editor.Shared
+{
+    public partial class ModalDialog1 : ComponentBase
+    {
+
+        public bool Display { get; private set; }
+
+        public void Show()
+        {
+            this.Display = true;
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void Hide()
+        {
+            this.Display = false;
+            this.InvokeAsync(this.StateHasChanged);
+        }
+    }
+}
+</pre>
+
+<p>
+Note:</p>
+<ol start="1">
+<li>
+We're using <code>Show</code> to control the display of the modal. &nbsp; No Javascript and Css required to toggle it.</li>
+<li>
+We have two public methods to <code>Show</code> or <code>Hide</code> the dialog.</li>
+<li>
+We invoke <code>StateHasChanged</code> to render the component. &nbsp; There's no external trigger to re-render the component (no Parameters have changed and no UI event has occured), so we need to force a render. &nbsp; Comment them out and see what happens!</li>
+</ol>
+
+<h4>
+FetchData1</h4>
+<p>
+We use the <code>FetchData</code> page component as our template, so create a new Razor Component in <code>Pages</code> and call it <code>FetchData1</code>. &nbsp; Create a <code>FetchData1.razor.cs</code> code behind file. &nbsp; Remember to mark the class as <code>partial</code>.</p>
+<p>
+Add the following code.</p>
+<pre lang="html">
+@page "/fetchdata1"
+
+@using CEC.Blazor.Editor.Data
+
+&lt;h1&gt;Weather forecast&lt;/h1&gt;
+
+&lt;p&gt;This component demonstrates fetching data from a service.&lt;/p&gt;
+
+@if (forecasts == null)
+{
+    &lt;p&gt;&lt;em&gt;Loading...&lt;/em&gt;&lt;/p&gt;
+}
+else
+{
+    &lt;table class="table"&gt;
+        &lt;thead&gt;
+            &lt;tr&gt;
+                &lt;th&gt;Date&lt;/th&gt;
+                &lt;th&gt;Temp. &nbsp;(C)&lt;/th&gt;
+                &lt;th&gt;Temp. &nbsp;(F)&lt;/th&gt;
+                &lt;th&gt;Summary&lt;/th&gt;
+            &lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+            @foreach (var forecast in forecasts)
+            {
+                &lt;tr&gt;
+                    &lt;td&gt;@forecast.Date.ToShortDateString()&lt;/td&gt;
+                    &lt;td&gt;@forecast.TemperatureC&lt;/td&gt;
+                    &lt;td&gt;@forecast.TemperatureF&lt;/td&gt;
+                    &lt;td&gt;@forecast.Summary&lt;/td&gt;
+                    &lt;td&gt;&lt;button class="btn btn-primary" @onclick="() =&gt; ShowModalDialog()"&gt;Edit&lt;/button&gt;&lt;/td&gt;
+                &lt;/tr&gt;
+            }
+        &lt;/tbody&gt;
+    &lt;/table&gt;
+}
+
+&lt;ModalDialog1 @ref="this.Modal"&gt;&lt;/ModalDialog1&gt;
+</pre>
+
+<pre lang="c#">
+using CEC.Blazor.Editor.Data;
+using CEC.Blazor.Editor.Shared;
+using Microsoft.AspNetCore.Components;
+using System;
+using System.Threading.Tasks;
+
+namespace CEC.Blazor.Editor.Pages
+{
+    public partial class FetchData1 : ComponentBase
+    {
+        [Inject] WeatherForecastService ForecastService { get; set; }
+
+        private WeatherForecast[] forecasts;
+
+        private ModalDialog1 Modal { get; set; }
+
+        protected override async Task OnInitializedAsync()
+        {
+            forecasts = await ForecastService.GetForecastAsync(DateTime.Now);
+        }
+        private void ShowModalDialog()
+        {
+            this.Modal.Show();
+        }
+    }
+}
+</pre>
+
+<p>
+Note:</p>
+<ol start="1">
+<li>
+We've added an <i>Edit</i> button to each line to access the editor, linked to <code>ShowModalDialog</code>.</li>
+<li>
+We've added <code>ModalDialog1</code> as a component at the bottom of the page, and <code>@ref</code> it to a property.</li>
+<li>
+We've added a <code>ModalDialog1</code> property.</li>
+<li>
+We've added a <code>ShowModalDialog</code> method to open the Modal Dialog. &nbsp;</li>
+</ol>
+
+<p>
+We need to make a couple of final changes before building.</p>
+<h4>
+NavMenu.razor</h4>
+<p>
+We need to add a link in the <code>NavMenu</code> to our new page.</p>
+<pre lang="html">
+        &lt;li class="nav-item px-3"&gt;
+            &lt;NavLink class="nav-link" href="fetchdata1"&gt;
+                &lt;span class="oi oi-list-rich" aria-hidden="true"&gt;&lt;/span&gt; Fetch data 1
+            &lt;/NavLink&gt;
+        &lt;/li&gt;
+
+</pre>
+
+<h4>
+Site.css</h4>
+<p>
+We need to add the css for the Modal Dialog to the site css file. &nbsp; We can move this code to a component css file for production, but it easier to edit on-the-fly in <i>site.css</i>. &nbsp;  </p>
+<pre lang="css">
+div.modal-background {
+    display: block; 
+    position: fixed; 
+    z-index: 1; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+div.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto; 
+    padding: 10px;
+    border: 2px solid #888;
+    width: 90%;
+}
+</pre>
+
+<h3>
+Running Version 1</h3>
+<p>
+Run the application and go to <i>FetchData1</i>. &nbsp; Click on an edit button. &nbsp; All of the links on the underlying page are disabled. &nbsp;The three exit paths are:</p>
+<ol start="1">
+<li>
+The <i>Close</i> button.</li>
+<li>
+Enter a new URL.</li>
+<li>
+Close the browser tab or close the browser.</li>
+</ol>
+
+<p>
+I know there's a fourth, fifth,... &nbsp;(kill the process,hit the power switch,...) but nothing can stop those.</p>
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/CEC.Blazor.Editor/master/images/FetchData-1-0.png?token=AF6NT3O6GBXYO4M2LGHKWNTAEPWSG" alt="image"></img></p>
+<h2>
+Version 2</h2>
+<p>
+Let's now close these three exits. &nbsp; I've created <i>version2</i> files in the repo, but you can just update your original files if you wish.</p>
+<h3>
+Site.js</h3>
+<p>
+Add a <i>js</i> folder to <i>wwwroot</i>, and add a <i>site.js</i> file.</p>
+<p>
+Add the following code. &nbsp; </p>
+<ol start="1">
+<li>
+We define <code>window.cecblazor_showExitDialog</code> - an event function that pops up the browser "Are You Sure" implementation. &nbsp; What appears differs between browsers, but some sort of exit challenge is always raised.</li>
+<li>
+We define <code>window.cecblazor_setEditorExitCheck</code> which we will call though Blazor's <code>JsInterop</code> to add and remove the event handler.</li>
+</ol>
+
+<pre lang="js">
+window.cecblazor_setEditorExitCheck = function (show) {
+    if (show) {
+        window.addEventListener("beforeunload", cecblazor_showExitDialog);
+    }
+    else {
+        window.removeEventListener("beforeunload", cecblazor_showExitDialog);
+    }
+}
+
+window.cecblazor_showExitDialog = function (event) {
+    event.preventDefault();
+    event.returnValue = "There are unsaved changes on this page. &nbsp; Do you want to leave?";
+}
+</pre>
+
+<p>
+We need to include this <code>js</code> file in our application. &nbsp; Update <code>Host._cshtml</code></p>
+<pre lang="html">
+.....
+    &lt;/div&gt;
+
+    &lt;script src="_framework/blazor.server.js"&gt;&lt;/script&gt;
+    &lt;script src="js/site.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<h3>
+Modal Dialog</h3>
+<p>
+We need to add more functionality to the modal dialog to simulate a dirty form. &nbsp; Update the button row in <code>ModalDialog</code>.</p>
+<pre lang="html">
+&lt;div class="row"&gt;
+    &lt;div class="col-12 text-right"&gt;
+        &lt;button class="btn @this.DirtyButtonCss" @onclick="() =&gt; SetDirty()"&gt;@this.DirtyButtonText&lt;/button&gt;
+        @if (this.DirtyExit)
+        {
+            &lt;button class="btn btn-danger" @onclick="() =&gt; DirtyHide()"&gt;Dirty Close&lt;/button&gt;
+            &lt;button class="btn btn-dark" @onclick="() =&gt; CancelHide()"&gt;Cancel&lt;/button&gt;
+        }
+        else
+        {
+            &lt;button class="btn btn-secondary" @onclick="() =&gt; Hide()"&gt;Close&lt;/button&gt;
+        }
+    &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+
+<p>
+Update the code behind file adding:</p>
+<ol start="1">
+<li>
+Boolean properties - <code>IsDirty</code>, <code>IsLocked</code> and <code>DirtyExit</code> - to control if the control state and button display.</li>
+<li>
+Inject <code>IJSRuntime</code> for access to <code>JSInterop</code>.</li>
+<li>
+CSS string properties to control the button CSS.</li>
+<li>
+Various button event handlers to switch the states. &nbsp; you should be able to work out the logic yourself.</li>
+<li>
+<code>SetPageExitCheck</code> to interact with the page JS, and turn the browser exit challenge on and off.</li>
+</ol>
+
+<pre lang="c#">
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+
+namespace CEC.Blazor.Editor.Shared
+{
+    public partial class ModalDialog2 : ComponentBase
+    {
+        [Inject] private IJSRuntime _js { get; set; }
+
+        public bool Display { get; private set; }
+
+        public bool IsDirty { get; set; }
+
+        public bool IsLocked { get; private set; }
+
+        private bool DirtyExit { get; set; }
+
+        private string DirtyButtonCss =&gt; this.IsDirty ? "btn-danger" : "btn-success";
+
+        private string DirtyButtonText =&gt; this.IsDirty ? "Set Clean" : "Set Dirty";
+
+        public void Show()
+        {
+            this.Display = true;
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void Hide()
+        {
+            if (this.IsDirty)
+                this.DirtyExit = true;
+            else
+                this.Display = false;
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void DirtyHide()
+        {
+            this.Display = false;
+            this.DirtyExit = false;
+            if (this.IsDirty)
+            {
+                this.IsDirty = false;
+                CheckLock();
+            }
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void CancelHide()
+        {
+            this.DirtyExit = false;
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void SetDirty()
+        {
+            if (this.IsDirty) 
+                this.DirtyExit = false;
+            this.IsDirty = !this.IsDirty;
+            this.CheckLock();
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void SetPageExitCheck(bool action)
+        {
+            _js.InvokeAsync&lt;bool&gt;("cecblazor_setEditorExitCheck", action);
+        }
+
+        public void CheckLock()
+        {
+            if (this.IsDirty && !this.IsLocked)
+            {
+                this.IsLocked = true;
+                this.SetPageExitCheck(true);
+            }
+            else if (this.IsLocked && !this.IsDirty)
+            {
+                this.IsLocked = false;
+                this.SetPageExitCheck(false);
+            }
+        }
+    }
+}
+</pre>
+
+<h3>
+Running Version 2</h3>
+<p>
+Now run the application. &nbsp; Click on an edit button. &nbsp; All of the links on the underlying page are disabled. &nbsp;Click on <i>Set Dirty</i> to simulate editing a field. &nbsp; Now try to close or navigate away or close the browser. &nbsp; All the options should be covered</p>
+<ol start="1">
+<li>
+ Closing the browser, navigating away in the toolbar, F5 or closing the browser window hits the browser "Do you want to Leave Dialog".</li>
+<li>
+Close gives you the <i>Dirty Exit</i> option.</li>
+<li>
+Clicking anywhere is the browser window does nothing.</li>
+</ol>
+
+<p>
+<img src="https://raw.githubusercontent.com/ShaunCurtis/CEC.Blazor.Editor/master/images/FetchData-2-0.png?token=AF6NT3MSOFQPAIKMXLBR2J3AEPWXA" alt="image"></img></p>
+<h2>
+Version 3</h2>
+<p>
+Now lets move on to creating a ModalDialog framework we can use in production. &nbsp; This will be a modal dialog wrapper that we can use to display any component. &nbsp; In this case the <code>WeatherViewer</code> and <code>ModalEditor</code> components. &nbsp; I've created a <i>Component</i> directory structure to organise the code, but keep it all in the base namespace for simplicity.</p>
+<p>
+First we need to add some some utility classes.</p>
+<h4>
+ModalResult and ModalResultType</h4>
+<p>
+In <i>Components/ModalDialog</i> add a <code>ModalResult</code> class. &nbsp; The code is below.</p>
+<p>
+The class provides a container for return values when the Dialog is closed. &nbsp; It returns an object <code>Data</code> and a <code>ModalResultType</code>. &nbsp; The static constructors are for building an instance.</p>
+<pre lang="c#">
+namespace CEC.Blazor.Editor
+{
+    public enum ModalResultType { NoSet, OK, Cancel, Exit }
+
+    public class ModalResult
+    {
+        public ModalResultType ResultType { get; private set; } = ModalResultType.NoSet;
+        public object Data { get; set; } = null;
+
+        public static ModalResult OK() =&gt; new ModalResult() { ResultType = ModalResultType.OK };
+        public static ModalResult Exit() =&gt; new ModalResult() { ResultType = ModalResultType.Exit };
+        public static ModalResult Cancel() =&gt; new ModalResult() { ResultType = ModalResultType.Cancel };
+        public static ModalResult OK(object data) =&gt; new ModalResult() { Data = data, ResultType = ModalResultType.OK };
+        public static ModalResult Exit(object data) =&gt; new ModalResult() { Data = data, ResultType = ModalResultType.Exit };
+        public static ModalResult Cancel(object data) =&gt; new ModalResult() { Data = data, ResultType = ModalResultType.Cancel };
+    }
+}
+</pre>
+
+<h4>
+ModalOptions</h4>
+<p>
+Now add a <code>ModalOptions</code> class. &nbsp;It's a container to pass configuration options into the modal dialog. &nbsp; It's a simple <code>IEnumerable</code> collection object with getters and setters.</p>
+<pre lang="c#">
+using System.Collections;
+using System.Collections.Generic;
+
+namespace CEC.Blazor.Editor
+{
+    public class ModalOptions :IEnumerable&lt;KeyValuePair&lt;string, object&gt;&gt;
+    {
+        // Ststic List of options - only one currently defined
+        public static readonly string __Width = "Width";
+
+        private Dictionary&lt;string, object&gt; Parameters { get; } = new Dictionary&lt;string, object&gt;();
+
+        public IEnumerator&lt;KeyValuePair&lt;string, object&gt;&gt; GetEnumerator()
+        {
+            foreach (var item in Parameters)
+                yield return item;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+            =&gt; this.GetEnumerator();
+
+        public T Get&lt;T&gt;(string key)
+        {
+            if (this.Parameters.ContainsKey(key))
+            {
+                if (this.Parameters[key] is T t) return t;
+            }
+            return default;
+        }
+
+        public bool TryGet&lt;T&gt;(string key, out T value)
+        {
+            value = default;
+            if (this.Parameters.ContainsKey(key))
+            {
+                if (this.Parameters[key] is T t)
+                {
+                    value = t;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool Set(string key, object value)
+        {
+            if (this.Parameters.ContainsKey(key))
+            {
+                this.Parameters[key] = value;
+                return false;
+            }
+            this.Parameters.Add(key, value);
+            return true;
+        }
+    }
+}
+</pre>
+
+<h3>
+IModalDialog</h3>
+<p>
+Add a <code>IModalDialog</code> interface. &nbsp;It defines the public properties and methods that any modal dialog we build need to implement. &nbsp;It provides an abstraction layer between our code and specific modal dialog implmentations - a clean CSS version, a BootStrap version, ....</p>
+<pre lang="c#">
+using Microsoft.AspNetCore.Components;
+using System.Threading.Tasks;
+
+namespace CEC.Blazor.Editor
+{
+    public interface IModalDialog
+    {
+        public ModalOptions Options { get; }
+
+        Task&lt;ModalResult&gt; ShowAsync&lt;TModal&gt;(ModalOptions options) where TModal : IComponent;
+        void Dismiss();
+        void Close(ModalResult result);
+        void Update(ModalOptions options = null);
+        void Lock(bool setlock);
+    }
+}
+</pre>
+
+<h3>
+ModalDialog</h3>
+<p>
+Now add <code>ModalDialog</code>, the base CSS agnostic implementation of <code>IModalDialog</code>.</p>
+<p>
+The Razor markup is pretty simple and similar to the prototype we coded:</p>
+<ol start="1">
+<li>
+<code>Display</code> turns it off and on.</li>
+<li>
+The ModalDialog isntance is cascaded so wrapped components has access to the Modal Dialog through the <code>IModalDialog</code> interface.</li>
+<li>
+Width can be set through <code>ModalOptions</code>.</li>
+<li>
+The content is built in a <code>RenderFragment</code> named <code>_Content</code>.</li>
+</ol>
+
+<pre lang="html">
+@namespace CEC.Blazor.Editor
+@implements IModalDialog
+
+@if (this.Display)
+{
+&lt;CascadingValue Value="(IModalDialog)this"&gt;
+    &lt;div class="modal-background"&gt;
+        &lt;div class="modal-content" style="@this.Width"&gt;
+            @this._Content
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/CascadingValue&gt;
+}
+</pre>
+
+<p>
+In the code:</p>
+<ol start="1">
+<li>
+We have a <code>ModalOptions</code> property which get's passed in through <code>ShowAsync</code>.</li>
+<li>
+We get the <code>Width</code> from <code>ModalOptions</code>.</li>
+<li>
+We use a <code>TaskCompletionSource</code> object to provide async behaviour and a <code>Task</code> the caller can <code>await</code>.</li>
+<li>
+<code>ShowAsync</code> uses generics. &nbsp;<code>TModal</code> can be any component that implements <code>IComponent</code> - <code>ComponentBase</code> does.</li>
+<li>
+<code>ShowAsync</code> builds <code>_Content</code> using a <code>RenderTreeBuilder</code>: it adds a new instance of component type <code>TModal</code> to <code>_Content</code>. &nbsp; It then sets <code>Display</code> to <code>true</code> and re-renders the modal dialog. &nbsp;If <code>TModal</code> is <code>WeatherEditor</code>,  the control effectively has <code>&lt;WeatherEditor&gt;&lt;/WeatherEditor&gt;</code> as it's content. &nbsp;</li>
+<li>
+<code>Dismiss</code> and <code>Close</code> close the Modal dialog by setting <code>Display</code> to false and rendering the control. &nbsp; They also clear the content and set the <code>Task</code> the caller may be awaiting to completed.</li>
+<li>
+The rest of the code is a modified version of the prototype code.</li>
+</ol>
+
+<pre lang="c#">
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using System.Threading.Tasks;
+
+namespace CEC.Blazor.Editor
+{
+    public partial class ModalDialog : IModalDialog
+    {
+        [Inject] private IJSRuntime _js { get; set; }
+
+        public ModalOptions Options { get; protected set; } = new ModalOptions();
+
+        public bool Display { get; protected set; }
+
+        public bool IsLocked { get; protected set; }
+
+        protected RenderFragment _Content { get; set; }
+
+        protected string Width =&gt; this.Options.TryGet&lt;string&gt;(ModalOptions.__Width, out string value) ? $"width:{value}" : string.Empty;
+
+        protected TaskCompletionSource&lt;ModalResult&gt; _ModalTask { get; set; } = new TaskCompletionSource&lt;ModalResult&gt;();
+
+        public Task&lt;ModalResult&gt; ShowAsync&lt;TModal&gt;(ModalOptions options) where TModal : IComponent
+        {
+            this.Options = options ??= this.Options;
+            this._ModalTask = new TaskCompletionSource&lt;ModalResult&gt;();
+            this._Content = new RenderFragment(builder =&gt;
+            {
+                builder.OpenComponent(1, typeof(TModal));
+                builder.CloseComponent();
+            });
+            this.Display = true;
+            InvokeAsync(StateHasChanged);
+            return this._ModalTask.Task;
+        }
+
+        /// &lt;summary&gt;
+        /// Method to update the state of the display based on UIOptions
+        /// &lt;/summary&gt;
+        /// &lt;param name="options"&gt;&lt;/param&gt;
+        public void Update(ModalOptions options = null)
+        {
+            this.Options = options ??= this.Options;
+            InvokeAsync(StateHasChanged);
+        }
+
+        /// &lt;summary&gt;
+        /// Method called by the dismiss button to close the dialog
+        /// sets the task to complete, show to false and renders the component (which hides it as show is false!)
+        /// &lt;/summary&gt;
+        public async void Dismiss()
+        {
+            _ = this._ModalTask.TrySetResult(ModalResult.Cancel());
+            this.Display = false;
+            this._Content = null;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        /// &lt;summary&gt;
+        /// Method called by child components through the cascade value of this component
+        /// sets the task to complete, show to false and renders the component (which hides it as show is false!)
+        /// &lt;/summary&gt;
+        /// &lt;param name="result"&gt;&lt;/param&gt;
+        public async void Close(ModalResult result)
+        {
+            _ = this._ModalTask.TrySetResult(result);
+            this.Display = false;
+            this._Content = null;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private void SetPageExitCheck(bool action)
+        {
+            _js.InvokeAsync&lt;bool&gt;("cecblazor_setEditorExitCheck", action);
+        }
+
+        public void Lock(bool setlock)
+        {
+            if (setlock && !this.IsLocked)
+            {
+                this.IsLocked = true;
+                this.SetPageExitCheck(true);
+            }
+            else if (this.IsLocked && !setlock)
+            {
+                this.IsLocked = false;
+                this.SetPageExitCheck(false);
+            }
+        }
+    }
+}
+</pre>
+
+<h2>
+Weather Components</h2>
+<p>
+I've shown only <code>WeatherEditor</code> here. &nbsp; <code>WeatherViewer</code> is a simpler version with no "Dirty" functionality. &nbsp; See the Repo for the code.</p>
+<h3>
+WeatherEditor</h3>
+<p>
+The Razor code is the same as we had in the prototype modal dialog.</p>
+<pre lang="html">
+@namespace CEC.Blazor.Editor
+&lt;div class="container-fluid"&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col"&gt;
+            &lt;h2&gt;Weather Editor&lt;/h2&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col"&gt;
+            Date
+        &lt;/div&gt;
+        &lt;div class="col"&gt;
+            @DateTime.Now.ToLongDateString()
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col"&gt;
+            Temperature C
+        &lt;/div&gt;
+        &lt;div class="col"&gt;
+            0 deg C
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col"&gt;
+            Temperature C
+        &lt;/div&gt;
+        &lt;div class="col"&gt;
+            32 deg F
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col"&gt;
+            Summary
+        &lt;/div&gt;
+        &lt;div class="col"&gt;
+            Another Beast-from-the-East day
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col-12 text-right"&gt;
+            &lt;button class="btn @this.DirtyButtonCss mr-1" @onclick="() =&gt; SetDirty()"&gt;@this.DirtyButtonText&lt;/button&gt;
+            @if (this.DoDirtyExit)
+            {
+                &lt;button class="btn btn-danger mr-1" @onclick="() =&gt; DirtyExit()"&gt;Dirty Close&lt;/button&gt;
+                &lt;button class="btn btn-dark mr-1" @onclick="() =&gt; CancelExit()"&gt;Cancel&lt;/button&gt;
+            }
+            else
+            {
+                &lt;button class="btn btn-secondary mr-1" @onclick="() =&gt; Exit()"&gt;Close&lt;/button&gt;
+            }
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+</pre>
+
+<p>
+Much of the control code is also extracted from the prototype code. &nbsp; We pick up the cascaded <code>IModalDialog</code> to use it's public interface methods to interact with the ModalDialog wrapper. &nbsp; For example <code>Exit</code> checks if the control <code>IsDirty</code>. &nbsp; If it's clean, it calls <code>this.Modal?.Close(ModalResult.OK())</code> which closes the dialog wrapper and destroys the instance of this class.</p>
+<pre lang="c#">
+using Microsoft.AspNetCore.Components;
+
+namespace CEC.Blazor.Editor
+{
+    public partial class WeatherEditor : ComponentBase
+    {
+        [CascadingParameter] private IModalDialog Modal { get; set; }
+
+        public bool IsDirty { get; set; }
+
+        public bool IsLocked { get; private set; }
+
+        private bool DoDirtyExit { get; set; }
+
+        private string DirtyButtonCss =&gt; this.IsDirty ? "btn-warning" : "btn-info";
+
+        private string DirtyButtonText =&gt; this.IsDirty ? "Set Clean" : "Set Dirty";
+
+        private void Exit()
+        {
+            if (this.IsDirty)
+            {
+                this.DoDirtyExit = true;
+                this.InvokeAsync(this.StateHasChanged);
+            }
+            else
+                this.Modal?.Close(ModalResult.OK());
+        }
+
+        public void DirtyExit()
+        {
+            if (this.DoDirtyExit)
+            {
+                this.IsDirty = false;
+                this.Modal?.Lock(false);
+                this.Modal?.Close(ModalResult.Cancel());
+            }
+        }
+
+        public void CancelExit()
+        {
+            this.DoDirtyExit = false;
+            this.InvokeAsync(this.StateHasChanged);
+        }
+
+        public void SetDirty()
+        {
+            if (this.IsDirty)
+                this.DoDirtyExit = false;
+            this.IsDirty = !this.IsDirty;
+            this.Modal?.Lock(this.IsDirty);
+            this.InvokeAsync(this.StateHasChanged);
+        }
+    }
+}
+</pre>
+
+<h3>
+FetchDataModal</h3>
+<p>
+Finally we create a new version of <code>FetchData</code> called <code>FetchDataModal</code> in <i>Pages</i>.</p>
+<p>
+The Razor markup is very similar to the prototypes.</p>
+<ol start="1">
+<li>
+We're using the <code>ModalDialog</code> version of modal dialog.</li>
+<li>
+We now have two buttons for each row to show the Editor or Viewer.</li>
+</ol>
+
+<pre lang="html">
+@page "/fetchdatamodal"
+
+@using CEC.Blazor.Editor.Data
+
+&lt;h1&gt;Weather forecast&lt;/h1&gt;
+
+&lt;p&gt;This component demonstrates fetching data from a service.&lt;/p&gt;
+
+@if (forecasts == null)
+{
+    &lt;p&gt;&lt;em&gt;Loading...&lt;/em&gt;&lt;/p&gt;
+}
+else
+{
+    &lt;table class="table"&gt;
+        &lt;thead&gt;
+            &lt;tr&gt;
+                &lt;th&gt;Date&lt;/th&gt;
+                &lt;th&gt;Temp. &nbsp;(C)&lt;/th&gt;
+                &lt;th&gt;Temp. &nbsp;(F)&lt;/th&gt;
+                &lt;th&gt;Summary&lt;/th&gt;
+            &lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+            @foreach (var forecast in forecasts)
+            {
+            &lt;tr&gt;
+                &lt;td&gt;@forecast.Date.ToShortDateString()&lt;/td&gt;
+                &lt;td&gt;@forecast.TemperatureC&lt;/td&gt;
+                &lt;td&gt;@forecast.TemperatureF&lt;/td&gt;
+                &lt;td&gt;@forecast.Summary&lt;/td&gt;
+                &lt;td&gt;&lt;button class="btn btn-secondary" @onclick="() =&gt; ShowViewDialog()"&gt;View&lt;/button&gt;&lt;/td&gt;
+                &lt;td&gt;&lt;button class="btn btn-primary" @onclick="() =&gt; ShowEditDialog()"&gt;Edit&lt;/button&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+            }
+        &lt;/tbody&gt;
+    &lt;/table&gt;
+}
+
+&lt;ModalDialog @ref="this.Modal"&gt;&lt;/ModalDialog&gt;
+
+</pre>
+
+<p>
+Very similar to the prototype with:</p>
+<ol start="1">
+<li>
+<code>ShowViewDialog</code> setting up <code>ModalOptions</code> and then calling <code>await this.Modal.ShowAsync&lt;WeatherViewer&gt;(options)</code>. &nbsp; We're running async and waiting on the dialog to open and then close before completing, and passing type <code>WeatherViewer</code> for <code>Modaldialog</code> to display.</li>
+<li>
+<code>ShowEditDialog</code> does as above, but loads <code>WeatherViewer</code> instead. &nbsp; </li>
+</ol>
+
+<pre lang="c#">
+using CEC.Blazor.Editor.Data;
+using Microsoft.AspNetCore.Components;
+using System;
+using System.Threading.Tasks;
+
+namespace CEC.Blazor.Editor.Pages
+{
+    public partial class FetchDataModal : ComponentBase
+    {
+        [Inject] WeatherForecastService ForecastService { get; set; }
+
+        private WeatherForecast[] forecasts;
+
+        private ModalDialog Modal { get; set; }
+
+        protected override async Task OnInitializedAsync()
+        {
+            forecasts = await ForecastService.GetForecastAsync(DateTime.Now);
+        }
+
+        private async void ShowViewDialog()
+        {
+            var options = new ModalOptions();
+            options.Set(ModalOptions.__Width, "60%");
+            await this.Modal.ShowAsync&lt;WeatherViewer&gt;(options);
+        }
+
+        private async void ShowEditDialog()
+        {
+            var options = new ModalOptions();
+            options.Set(ModalOptions.__Width, "80%");
+            await this.Modal.ShowAsync&lt;WeatherEditor&gt;(options);
+            // any code to execute after the editor is complete goes here
+        }
+    }
+}
+</pre>
+
+<h2>
+Wrap Up</h2>
+<p>
+Hopefully I've demonstrated some techniques and strategies for dealing with edit state in Blazor and SPAs. &nbsp; Some key points to take from this article:</p>
+<ol start="1">
+<li>
+You can block all the normal exit routes a user has from a dirty form.</li>
+<li>
+You can build HTML dialogs that act in a similar manner to modal dialogs in desktop applications.</li>
+<li>
+Modal Dialogs can be async and you can wait on their completion.</li>
+</ol>
+
+<p>
+There will be second article shortly covering how to use this infrastructure in a real editor setting, and how to integrate edit state and validation state into records.</p>
+
+</body>
+</html>

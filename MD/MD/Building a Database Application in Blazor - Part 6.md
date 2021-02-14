@@ -23,11 +23,14 @@ As we're building both Server and WASM deployments, we have 4 projects to which 
 3. **CEC.Blazor.WASM.Client** - the WASM project
 4. **CEC.Blazor.WASM.Server** - the API server for the WASM project
 
-The majority of code is library code in CEC.Blazor.
+The majority of code is library code in CEC.Blazor.SPA.
 
 ## Sample Project and Code
 
-The base code is here in the [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor).
+The repository for the articles has moved to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
+
+[You can see the Server and WASM versions of the project running here on the same site](https://cec-blazor-server.azurewebsites.net/).
+
 
 ## Overview of the Process
 
@@ -234,15 +237,49 @@ We need to:
 1. We implement IDbRecord.
 2. We add the SPParameter custom attribute to all the properties that map to the Stored Procedures.
 3. We decorate Properties that are not mapped to the Database View with `[Not Mapped]`.
+4. We declare the DbRecordInfo with the correct naming convention and stored procedures.
+5. We add the entries to the application `DataDictionary`.
+6. We add the `AsProperties` property and `FromProperties` method.
 
 ```c#
-// CEC.Weather/Model/DbWeatherStation.cs
-public class DbWeatherStation :
-    IDbRecord<DbWeatherStation>
+// CEC.Weather/Data/Base/DataDictionary.cs
+public static class DataDictionary
+{
+    // Weather Forecast Fields
+    .......
+
+    // Weather Station Fields
+    public static readonly RecordFieldInfo __WeatherStationID = new RecordFieldInfo("WeatherStationID");
+    public static readonly RecordFieldInfo __WeatherStationName = new RecordFieldInfo("WeatherStationName");
+    public static readonly RecordFieldInfo __WeatherStationLatitude = new RecordFieldInfo("WeatherStationLatitude");
+    public static readonly RecordFieldInfo __WeatherStationLongitude = new RecordFieldInfo("WeatherStationLongitude");
+    public static readonly RecordFieldInfo __WeatherStationElevation = new RecordFieldInfo("WeatherStationElevation");
+
+    // Weather Report Fields
+    public static readonly RecordFieldInfo __WeatherReportID = new RecordFieldInfo("WeatherReportID");
+    public static readonly RecordFieldInfo __WeatherReportDate = new RecordFieldInfo("WeatherReportDate");
+    public static readonly RecordFieldInfo __WeatherReportTempMax = new RecordFieldInfo("WeatherReportTempMax");
+    public static readonly RecordFieldInfo __WeatherReportTempMin = new RecordFieldInfo("WeatherReportTempMin");
+    public static readonly RecordFieldInfo __WeatherReportFrostDays = new RecordFieldInfo("WeatherReportFrostDays");
+    public static readonly RecordFieldInfo __WeatherReportRainfall = new RecordFieldInfo("WeatherReportRainfall");
+    public static readonly RecordFieldInfo __WeatherReportSunHours = new RecordFieldInfo("WeatherReportSunHours");
+    public static readonly RecordFieldInfo __WeatherReportDisplayName = new RecordFieldInfo("WeatherReportDisplayName");
+    public static readonly RecordFieldInfo __WeatherReportMonth = new RecordFieldInfo("WeatherReportMonth");
+    public static readonly RecordFieldInfo __WeatherReportYear = new RecordFieldInfo("WeatherReportYear");
+}
+```
+
+```c#
+// CEC.Weather/Data/Models/DbWeatherStation.cs
+public class DbWeatherStation 
+        :IDbRecord<DbWeatherStation>
 {
     [NotMapped]
+    public Guid GUID => Guid.NewGuid();
+
+    [NotMapped]
     public int WeatherStationID { get => this.ID; }
-    
+
     [SPParameter(IsID = true, DataType = SqlDbType.Int)]
     public int ID { get; set; } = -1;
 
@@ -254,11 +291,11 @@ public class DbWeatherStation :
     public decimal Latitude { get; set; } = 1000;
 
     [SPParameter(DataType = SqlDbType.Decimal)]
-    [Column(TypeName ="decimal(8,4)")]
+    [Column(TypeName = "decimal(8,4)")]
     public decimal Longitude { get; set; } = 1000;
 
     [SPParameter(DataType = SqlDbType.Decimal)]
-    [Column(TypeName ="decimal(8,2)")]
+    [Column(TypeName = "decimal(8,2)")]
     public decimal Elevation { get; set; } = 1000;
 
     public string DisplayName { get; set; }
@@ -266,24 +303,47 @@ public class DbWeatherStation :
     [NotMapped]
     public string LatLong => $"{this.Latitude.AsLatitude()} {this.Longitude.AsLongitude()}";
 
-    public void SetNew() => this.ID = 0;
+    [NotMapped]
+    public DbRecordInfo RecordInfo => DbWeatherStation.RecInfo;
 
-    public DbWeatherStation ShadowCopy()
+    [NotMapped]
+    public static DbRecordInfo RecInfo => new DbRecordInfo()
     {
-        return new DbWeatherStation() {
-            Name = this.Name,
-            ID = this.ID,
-            Latitude = this.Latitude,
-            Longitude = this.Longitude,
-            Elevation = this.Elevation,
-            DisplayName = this.DisplayName
+        CreateSP = "sp_Create_WeatherStation",
+        UpdateSP = "sp_Update_WeatherStation",
+        DeleteSP = "sp_Delete_WeatherStation",
+        RecordDescription = "Weather Station",
+        RecordName = "WeatherStation",
+        RecordListDescription = "Weather Stations",
+        RecordListName = "WeatherStations"
+    };
+
+    public RecordCollection AsProperties() =>
+        new RecordCollection()
+        {
+            { DataDictionary.__WeatherStationID, this.ID },
+            { DataDictionary.__WeatherStationName, this.Name },
+            { DataDictionary.__WeatherStationLatitude, this.Latitude },
+            { DataDictionary.__WeatherStationLongitude, this.Longitude },
+            { DataDictionary.__WeatherStationElevation, this.Elevation }
+    };
+
+    public static DbWeatherStation FromProperties(RecordCollection recordvalues) =>
+        new DbWeatherStation()
+        {
+            ID = recordvalues.GetEditValue<int>(DataDictionary.__WeatherStationID),
+            Name = recordvalues.GetEditValue<string>(DataDictionary.__WeatherStationName),
+            Latitude = recordvalues.GetEditValue<decimal>(DataDictionary.__WeatherStationLatitude),
+            Longitude = recordvalues.GetEditValue<decimal>(DataDictionary.__WeatherStationLongitude),
+            Elevation = recordvalues.GetEditValue<decimal>(DataDictionary.__WeatherStationElevation)
         };
-    }
+
+    public DbWeatherStation GetFromProperties(RecordCollection recordvalues) => DbWeatherStation.FromProperties(recordvalues);
 }
 ```
 
 ```c#
-// CEC.Weather/Model/DbWeatherReport.cs
+// CEC.Weather/Data/Models/DbWeatherReport.cs
 public class DbWeatherReport :IDbRecord<DbWeatherReport>
 {
     [NotMapped]
@@ -353,7 +413,7 @@ public class DbWeatherReport :IDbRecord<DbWeatherReport>
 
 ### Add Some Utility Classes
 
-I'm a great believer in making life easier.  Extension methods are great for this. Longitudes and Latitudes are handled as decimals, but we need to present them a little differently in the UI. We use decimal extension methods to do this.
+I'm a firm believer in making life easier.  Extension methods are great for this. Longitudes and Latitudes are handled as decimals, but we need to present them a little differently in the UI. We use decimal extension methods to do this.
 
 ```c#
 // CEC.Weather/Extensions/DecimalExtensions.cs
@@ -364,49 +424,247 @@ public static class DecimalExtensions
     public static string AsLongitude(this decimal value) => value > 0 ? $"{value}E" : $"{Math.Abs(value)}W";
 }
 ```
-The application uses Blazored Fluent Validation for the Editors.  It's more flexible that the built in validation.
+### RecordEditContexts
+
+We need to build a RecordEditContext for each model
 
 ```c#
-// CEC.Weather/Data/Validators/WeatherStationValidator.cs
-using FluentValidation;
-
-namespace CEC.Weather.Data.Validators
+// CEC.Weather/Data/EditModels/WeatherReportEditContext.cs
+public class WeatherReportEditContext : RecordEditContext, IRecordEditContext
 {
-    public class WeatherStationValidator : AbstractValidator<DbWeatherStation>
+    #region Public
+
+    public DateTime WeatherReportDate
     {
-        public WeatherStationValidator()
+        get => this.RecordValues.GetEditValue<DateTime>(DataDictionary.__WeatherReportDate);
+        set
         {
-            RuleFor(p => p.Longitude).LessThan(-180).WithMessage("Longitude must be -180 or greater");
-            RuleFor(p => p.Longitude).GreaterThan(180).WithMessage("Longitude must be 180 or less");
-            RuleFor(p => p.Latitude).LessThan(-90).WithMessage("Latitude must be -90 or greater");
-            RuleFor(p => p.Latitude).GreaterThan(90).WithMessage("Latitude must be 90 or less");
-            RuleFor(p => p.Name).MinimumLength(1).WithMessage("Your need a Station Name!");
+            this.RecordValues.SetField(DataDictionary.__WeatherReportDate, value);
+            this.Validate();
         }
+    }
+
+    public decimal WeatherReportTempMax
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherReportTempMax);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherReportTempMax, value);
+            this.Validate();
+        }
+    }
+
+    public decimal WeatherReportTempMin
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherReportTempMin);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherReportTempMin, value);
+            this.Validate();
+        }
+    }
+
+    public int WeatherReportFrostDays
+    {
+        get => this.RecordValues.GetEditValue<int>(DataDictionary.__WeatherReportFrostDays);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherReportFrostDays, value);
+            this.Validate();
+        }
+    }
+
+    public decimal WeatherReportRainfall
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherReportRainfall);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherReportRainfall, value);
+            this.Validate();
+        }
+    }
+
+    public decimal WeatherReportSunHours
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherReportSunHours);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherReportSunHours, value);
+            this.Validate();
+        }
+    }
+
+    public int WeatherStationID
+    {
+        get => this.RecordValues.GetEditValue<int>(DataDictionary.__WeatherStationID);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherStationID, value);
+            this.Validate();
+        }
+    }
+
+    public bool WeatherReportID
+    {
+        get => this.RecordValues.GetEditValue<bool>(DataDictionary.__WeatherReportID);
+    }
+
+    public WeatherReportEditContext(RecordCollection collection) : base(collection) { }
+
+    #endregion
+
+    #region Protected
+
+    protected override void LoadValidationActions()
+    {
+        base.LoadValidationActions();
+        this.ValidationActions.Add(ValidateTempMax);
+        this.ValidationActions.Add(ValidateTempMin);
+        this.ValidationActions.Add(ValidateDate);
+        this.ValidationActions.Add(ValidateFrostDays);
+        this.ValidationActions.Add(ValidateRainfall);
+        this.ValidationActions.Add(ValidateSunHours);
+    }
+
+    #endregion
+
+    #region Private
+
+    private bool ValidateDate()
+    {
+        return this.WeatherReportDate.Validation(DataDictionary.__WeatherReportDate.FieldName, this, ValidationMessageStore)
+            .NotDefault("You must select a date")
+            .Validate();
+    }
+
+    private bool ValidateTempMax()
+    {
+        return this.WeatherReportTempMax.Validation(DataDictionary.__WeatherReportTempMax.FieldName, this, ValidationMessageStore)
+            .LessThan(70, "The temperature must be less than 70C")
+            .GreaterThan(-60, "The temperature must be greater than -60C")
+            .Validate();
+    }
+
+    private bool ValidateTempMin()
+    {
+        return this.WeatherReportTempMin.Validation(DataDictionary.__WeatherReportTempMin.FieldName, this, ValidationMessageStore)
+            .LessThan(70, "The temperature must be less than 70C")
+            .GreaterThan(-60, "The temperature must be greater than -60C")
+            .Validate();
+    }
+
+    private bool ValidateFrostDays()
+    {
+        return this.WeatherReportTempMin.Validation(DataDictionary.__WeatherReportFrostDays.FieldName, this, ValidationMessageStore)
+            .LessThan(32)
+            .GreaterThan(-1)
+            .Validate("There are between 0 and 31 frost days in a month");
+    }
+
+    private bool ValidateRainfall()
+    {
+        return this.WeatherReportRainfall.Validation(DataDictionary.__WeatherReportRainfall.FieldName, this, ValidationMessageStore)
+            .GreaterThanOrEqualTo(0, "Rainfall can't be a negative amount")
+            .Validate();
+    }
+
+    private bool ValidateSunHours()
+    {
+        return this.WeatherReportSunHours.Validation(DataDictionary.__WeatherReportSunHours.FieldName, this, ValidationMessageStore)
+            .GreaterThanOrEqualTo(0, "Sun hours per month can't be a negative amount")
+            .Validate();
     }
 }
 ```
 
 ```c#
-// CEC.Weather/Data/Validators/WeatherReportValidator.cs
-using FluentValidation;
-
-namespace CEC.Weather.Data.Validators
+// CEC.Weather/Data/EditModels/WeatherStationEditContext.cs
+public class WeatherStationEditContext : RecordEditContext, IRecordEditContext
 {
-    public class WeatherReportValidator : AbstractValidator<DbWeatherReport>
+
+    public string WeatherStationName
     {
-        public WeatherReportValidator()
+        get => this.RecordValues.GetEditValue<string>(DataDictionary.__WeatherStationName);
+        set
         {
-            RuleFor(p => p.Date).NotEmpty().WithMessage("You must select a date");
-            RuleFor(p => p.TempMax).LessThan(60).WithMessage("The temperature must be less than 60C");
-            RuleFor(p => p.TempMax).GreaterThan(-40).WithMessage("The temperature must be greater than -40C");
-            RuleFor(p => p.TempMin).LessThan(60).WithMessage("The temperature must be less than 60C");
-            RuleFor(p => p.TempMin).GreaterThan(-40).WithMessage("The temperature must be greater than -40C");
-            RuleFor(p => p.FrostDays).LessThan(32).WithMessage("There's a maximun of 31 days in any month");
-            RuleFor(p => p.FrostDays).GreaterThan(0).WithMessage("valid entries are 0-31");
-            RuleFor(p => p.Rainfall).GreaterThan(0).WithMessage("valid entries are 0-31");
-            RuleFor(p => p.SunHours).LessThan(24).WithMessage("Valid entries 0-24");
-            RuleFor(p => p.SunHours).GreaterThan(0).WithMessage("Valid entries 0-24");
+            this.RecordValues.SetField(DataDictionary.__WeatherStationName, value);
+            this.Validate();
         }
+    }
+
+    public decimal WeatherStationLatitude
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherStationLatitude);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherStationLatitude, value);
+            this.Validate();
+        }
+    }
+
+    public decimal WeatherStationLongitude
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherStationLongitude);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherStationLongitude, value);
+            this.Validate();
+        }
+    }
+
+    public decimal WeatherStationElevation
+    {
+        get => this.RecordValues.GetEditValue<decimal>(DataDictionary.__WeatherStationElevation);
+        set
+        {
+            this.RecordValues.SetField(DataDictionary.__WeatherStationElevation, value);
+            this.Validate();
+        }
+    }
+
+    public int WeatherStationID 
+        => this.RecordValues.GetEditValue<int>(DataDictionary.__WeatherStationID);
+
+    public WeatherStationEditContext(RecordCollection collection) : base(collection) { }
+
+    protected override void LoadValidationActions()
+    {
+        base.LoadValidationActions();
+        this.ValidationActions.Add(ValidateName);
+        this.ValidationActions.Add(ValidateLatitude);
+        this.ValidationActions.Add(ValidateLongitude);
+        this.ValidationActions.Add(ValidateElevation);
+    }
+
+    private bool ValidateName()
+    {
+        return this.WeatherStationName.Validation(DataDictionary.__WeatherStationName.FieldName, this, ValidationMessageStore)
+            .LongerThan(6, "Name must be longer than 6 letters")
+            .Validate();
+    }
+
+    private bool ValidateLatitude()
+    {
+        return this.WeatherStationLatitude.Validation(DataDictionary.__WeatherStationLatitude.FieldName, this, ValidationMessageStore)
+            .GreaterThanOrEqualTo(-90)
+            .LessThanOrEqualTo(90)
+            .Validate("Latitude should be in the range -90 to 90");
+    }
+
+    private bool ValidateLongitude()
+    {
+        return this.WeatherStationLongitude.Validation(DataDictionary.__WeatherStationLongitude.FieldName, this, ValidationMessageStore)
+            .GreaterThanOrEqualTo(-180)
+            .LessThanOrEqualTo(180)
+            .Validate("Longitude should be in the range -180 to 180");
+    }
+
+    private bool ValidateElevation()
+    {
+        return this.WeatherStationElevation.Validation(DataDictionary.__WeatherStationElevation.FieldName, this, ValidationMessageStore)
+            .GreaterThanOrEqualTo(-1000)
+            .LessThanOrEqualTo(10000)
+            .Validate("Elevation should be in the range -1000 to 10000");
     }
 }
 ```
@@ -440,96 +698,39 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 }
 ```
 
-### Add Data and Controller Services
+### Add Controller Services
 
 We only show the Weather Station Services code here - the Weather Report Services are identical.
- 
-Add the `IWeatherStationDataService` and `IWeatherReportDataService` interfaces.
-
-```c#
-// CEC.Weather/Services/Interfaces/IWeatherStationDataService.cs
-using CEC.Blazor.Services;
-using CEC.Weather.Data;
-
-namespace CEC.Weather.Services
-{
-    public interface IWeatherStationDataService : 
-        IDataService<DbWeatherStation, WeatherForecastDbContext>
-    {}
-}
-```
 
 Add the Server Data Services.
 
 ```c#
-// CEC.Weather/Services/DataServices/WeatherStationServerDataService.cs
-using CEC.Blazor.Data;
+// CEC.Weather/Services/ControllerServices/WeatherStationServerControllerService.cs
 using CEC.Weather.Data;
 using CEC.Blazor.Services;
-using Microsoft.Extensions.Configuration;
-
-namespace CEC.Weather.Services
-{
-    public class WeatherStationServerDataService :
-        BaseServerDataService<DbWeatherStation, WeatherForecastDbContext>,
-        IWeatherStationDataService
-    {
-        public WeatherStationServerDataService(IConfiguration configuration, IDbContextFactory<WeatherForecastDbContext> dbcontext) : base(configuration, dbcontext)
-        {
-            this.RecordConfiguration = new RecordConfigurationData() { RecordName = "WeatherStation", RecordDescription = "Weather Station", RecordListName = "WeatherStation", RecordListDecription = "Weather Stations" };
-        }
-    }
-}
-```
-
-Add the WASM Data Services
-
-```c#
-// CEC.Weather/Services/DataServices/WeatherStationWASMDataService.cs
-using CEC.Weather.Data;
-using CEC.Blazor.Services;
-using Microsoft.Extensions.Configuration;
-using System.Net.Http;
-using CEC.Blazor.Data;
-
-namespace CEC.Weather.Services
-{
-    public class WeatherStationWASMDataService :
-        BaseWASMDataService<DbWeatherStation, WeatherForecastDbContext>,
-        IWeatherStationDataService
-    {
-        public WeatherStationWASMDataService(IConfiguration configuration, HttpClient httpClient) : base(configuration, httpClient)
-        {
-            this.RecordConfiguration = new RecordConfigurationData() { RecordName = "WeatherStation", RecordDescription = "Weather Station", RecordListName = "WeatherStation", RecordListDecription = "Weather Stations" };
-        }
-    }
-}
-```
-
-Add the Controller Services
-
-```c#
-// CEC.Weather/Services/ControllerServices/WeatherStationControllerService.cs
-using CEC.Weather.Data;
-using CEC.Blazor.Services;
-using CEC.Blazor.Utilities;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace CEC.Weather.Services
 {
-    public class WeatherStationControllerService : BaseControllerService<DbWeatherStation, WeatherForecastDbContext>, IControllerService<DbWeatherStation, WeatherForecastDbContext>
+    public class WeatherReportControllerService 
+        : FactoryControllerService<DbWeatherReport, WeatherForecastDbContext>
     {
+
         /// <summary>
         /// List of Outlooks for Select Controls
         /// </summary>
-        public SortedDictionary<int, string> OutlookOptionList => Utils.GetEnumList<WeatherOutlook>();
+        public SortedDictionary<int, string> StationLookupList { get; set; }
 
-        public WeatherStationControllerService(NavigationManager navmanager, IConfiguration appconfiguration, IWeatherStationDataService DataService) : base(appconfiguration, navmanager)
+        public WeatherReportControllerService(NavigationManager navmanager, IConfiguration appconfiguration,IFactoryDataService<WeatherForecastDbContext> dataService) : base(appconfiguration, navmanager, dataService)
         {
-            this.Service = DataService;
-            this.DefaultSortColumn = "ID";
+        }
+
+        public async Task LoadLookups()
+        {
+            this.StationLookupList = await this.GetLookUpListAsync<DbWeatherStation>();
         }
     }
 }

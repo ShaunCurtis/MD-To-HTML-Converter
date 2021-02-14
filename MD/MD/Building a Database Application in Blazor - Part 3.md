@@ -15,13 +15,11 @@ This article looks in detail at building reusable CRUD presentation layer compon
 
 ## Sample Project and Code
 
-The repository for the articles has move to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
+The repository for the articles has moved to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
 
 There's a SQL script in /SQL in the repository for building the database.
 
-[You can see the Server version of the project running here](https://cec-blazor-server.azurewebsites.net/).
-
-[You can see the WASM version of the project running here](https://cec-blazor-wasm.azurewebsites.net/).
+[You can see the Server and WASM versions of the project running here on the same site](https://cec-blazor-server.azurewebsites.net/).
 
 Serveral classes described here are part of the separate *CEC.Blazor.Core* library.  The Github is [here](https://github.com/ShaunCurtis/CEC.Blazor.Core), and is available as a Nuget Package.
 
@@ -415,9 +413,9 @@ This is the base for editor forms.  It:
 
 Before we look at the edit componments we need to take a sep back and look at the `Model` we'll use.  In Article 2 we looked at our data class `DbWeatherForecast` and saw the code for creating a `RecordCollection` from the data class and building a new `DbWeatherForecast` record from a `RecordCollection`.  Remember the properties in a `DbWeatherForecast` as immutable - they are declared `{get; init;}`.  The `RecordCollection` for a record is the editable copy of that record.  We don't create a simple edit version of `DbWeatherForecast`, or a simple `Dictionary` object because we want a build in a lot more functionality.
 
-#### RecordValue
+#### RecordFieldValue
 
-a `RecordValue` represents an editable version of a database record field.
+a `RecordFieldValue` represents an editable version of a database record field.
 
 Note:
 1. There's `Value` and `EditedValue` properties to keep track of the edit state of the field.
@@ -426,7 +424,7 @@ Note:
 4. `Guid` provides uniqueness.
 
 ```c#
-public class RecordValue
+public class RecordFieldValue
 {
     public string Field { get; }
     public Guid GUID { get; }
@@ -451,16 +449,16 @@ public class RecordValue
 ```
 #### RecordCollection
 
-A `RecordCollection` is a collection of `RecordValue` objects used to store record fields.  It:
+A `RecordCollection` is a collection of `RecordFieldValue` objects used to store record fields.  It:
 1. Implements `ICollection` - a lot of the functionality is the interface implementation.  
-2. Provides controlled access to the underlying list and methods to get and set `RecordValue` objects.
-3. As `RecordValue.Value` is defined as an object, generics are used to get values from a `RecordValue` object.
-4. `IsDirty` tests all the `RecordValue` objects in the list to check if the collection `IsDirty`.
+2. Provides controlled access to the underlying list and methods to get and set `RecordFieldValue` objects.
+3. As `RecordFieldValue.Value` is defined as an object, generics are used to get values from a `RecordFieldValue` object.
+4. `IsDirty` tests all the `RecordFieldValue` objects in the list to check if the collection `IsDirty`.
 
 ```c#
 public class RecordCollection : ICollection
 {
-    private List<RecordValue> _items = new List<RecordValue>() ;
+    private List<RecordFieldValue> _items = new List<RecordFieldValue>() ;
     public int Count => _items.Count;
     public bool IsSynchronized => false;
     public object SyncRoot => this;
@@ -485,7 +483,7 @@ public class RecordCollection : ICollection
             x.EditedValue = value;
             this.FieldValueChanged?.Invoke(this.IsDirty);
         }
-        else _items.Add(new RecordValue(FieldName, value));
+        else _items.Add(new RecordFieldValue(FieldName, value));
         return true;
     }
         
@@ -893,6 +891,52 @@ The View is a very simple. It:
 
 }
 ```
+#### ModalEditForm
+
+The final component to look at before we look at `WeatherForecastEditorForm` is `ModalEditForm`.  This replaces `Editform`.  It's a lot simpler, managing the render process to only show the edit components when the data, edit context and RecordEditContext are loaded.  It also cascades the `EditContext` to the input controls.
+
+1. There are four `RenderFragments` which are self-evident.
+2. `Isloaded` and `IsError` control which `RenderFragments` get rendered.
+
+
+```c#
+public class ModalEditForm : Component
+{
+
+    [Parameter] public RenderFragment EditorContent { get; set; }
+    [Parameter] public RenderFragment ButtonContent { get; set; }
+    [Parameter] public RenderFragment LoadingContent { get; set; }
+    [Parameter] public RenderFragment ErrorContent { get; set; }
+
+    [Parameter] public bool IsLoaded { get; set; }
+    [Parameter] public bool IsError { get; set; }
+
+    [Parameter] public EditContext EditContext { get; set; }
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        //Debug.Assert(EditContext != null);
+        if (this.IsLoaded)
+        {
+            // If EditContext changes, tear down and recreate all descendants.
+            // This is so we can safely use the IsFixed optimization on CascadingValue,
+            // optimizing for the common case where EditContext never changes.
+            builder.OpenRegion(EditContext.GetHashCode());
+            builder.OpenComponent<CascadingValue<EditContext>>(1);
+            builder.AddAttribute(2, "IsFixed", true);
+            builder.AddAttribute(3, "Value", this.EditContext);
+            builder.AddAttribute(4, "ChildContent", this.EditorContent);
+            builder.CloseComponent();
+            builder.CloseRegion();
+        }
+        else if (this.IsError)
+            builder.AddContent(10, this.ErrorContent);
+        else
+            builder.AddContent(10, this.LoadingContent);
+        builder.AddContent(20, this.ButtonContent);
+    }
+}
+```
 
 ### The Form
 
@@ -934,61 +978,63 @@ The Razor Markup below is an abbreviated version of the full file.  This makes e
     </Header>
     <Body>
         // Handles errors and controls when the enclosed code is rendered
-        <UIErrorHandler IsError="@this.IsError" IsLoading="this.Loading" ErrorMessage="@this.RecordErrorMessage">
-            <ChildContent>
-                // Cascades the EditContext - we are no longer using EditForm                      
-                <CascadingValue Value="this.EditContext">
-                    <UIContainer>
-                        <UIFormRow>
-                            // Example display only row
-                            <UILabelColumn Columns="4">
-                                Record ID:
-                            </UILabelColumn>
-                            <UIColumn Columns="2">
-                                <InputReadOnlyText Value="@this.WeatherForecastEditorContext.WeatherForecastID.ToString()"></InputReadOnlyText>
-                            </UIColumn>
-                        </UIFormRow>
-                        // Example data value row with label and edit control
-                        <UIFormRow>
-                            <UILabelColumn Columns="4">
-                                Record Date:
-                            </UILabelColumn>
-                            <UIColumn Columns="4">
-                                <InputDate class="form-control" @bind-Value="this.WeatherForecastEditorContext.WeatherForecastDate"></InputDate>
-                            </UIColumn>
-                        </UIFormRow>
-                        <UIFormRow>
-                            <UILabelColumn Columns="4">
-                                Temperature &deg; C:
-                            </UILabelColumn>
-                            <UIColumn Columns="2">
-                                <InputNumber class="form-control" @bind-Value="this.WeatherForecastEditorContext.WeatherForecastTemperatureC"></InputNumber>
-                            </UIColumn>
-                            <UIColumn Columns="6">
-                                <ValidationMessage For=@(() => this.WeatherForecastEditorContext.WeatherForecastTemperatureC) />
-                            </UIColumn>
-                        </UIFormRow>
+        <ModalEditForm EditContext="this.EditContext" IsError="this.IsError" IsLoaded="this.IsLoaded">
+            <ErrorContent>
+                <UIContainer>
+                    <UIRow>
+                        <UIColumn>
+                            @this.RecordErrorMessage
+                        </UIColumn>
+                    </UIRow>
+                </UIContainer>
+            </ErrorContent>
+
+            <LoadingContent>
+                <UILoading/>
+            </LoadingContent>
+
+            <EditorContent>
+                <UIContainer>
+                    // Example display only row
+                    <UIFormRow>
+                        <UILabelColumn Columns="4">
+                            Record ID:
+                        </UILabelColumn>
+                        <UIColumn Columns="2">
+                            <InputReadOnlyText Value="@this.WeatherForecastEditorContext.WeatherForecastID.ToString()"></InputReadOnlyText>
+                        </UIColumn>
+                    </UIFormRow>
+
+                    // Example data value row with label and edit control
+                    <UIFormRow>
+                        <UILabelColumn Columns="4">
+                            Record Date:
+                        </UILabelColumn>
+                        <UIColumn Columns="4">
+                            <InputDate class="form-control" @bind-Value="this.WeatherForecastEditorContext.WeatherForecastDate"></InputDate>
+                        </UIColumn>
+                    </UIFormRow>
                     ..... // more form rows here
-                    </UIContainer>
-                </CascadingValue>
-            </ChildContent>
+                </UIContainer>
+            </EditorContent>
+
             // always displayed section of the ErrorHandler.  Exit button to exit the form no matter what happens
-            <AlwaysDisplayContent>
+            <ButtonContent>
                 <UIContainer>
                     <UIRow>
                         <UIColumn Columns="7">
                             <UIAlert Alert="this.AlertMessage" SizeCode="Bootstrap.SizeCode.sm"></UIAlert>
                         </UIColumn>
                         <UIButtonColumn Columns="5">
-                            <UIButton Show="(!this.IsClean) && this.IsLoaded" ClickEvent="this.SaveAndExit" ColourCode="Bootstrap.ColourCode.save">Save &amp; Exit</UIButton>
-                            <UIButton Show="(!this.IsClean) && this.IsLoaded" ClickEvent="this.Save" ColourCode="Bootstrap.ColourCode.save">Save</UIButton>
-                            <UIButton Show="(!this.IsClean) && this.IsLoaded" ClickEvent="this.ConfirmExit" ColourCode="Bootstrap.ColourCode.danger_exit">Exit Without Saving</UIButton>
-                            <UIButton Show="this.IsClean" ClickEvent="this.TryExit" ColourCode="Bootstrap.ColourCode.nav">Exit</UIButton>
+                            <UIButton Disabled="!this.DisplaySave" ClickEvent="this.SaveAndExit" ColourCode="Bootstrap.ColourCode.save">@this.SaveButtonText &amp; Exit</UIButton>
+                            <UIButton Disabled="!this.DisplaySave" ClickEvent="this.Save" ColourCode="Bootstrap.ColourCode.save">@this.SaveButtonText</UIButton>
+                            <UIButton Show="this.DisplayCheckExit" ClickEvent="this.ConfirmExit" ColourCode="Bootstrap.ColourCode.danger_exit">Exit Without Saving</UIButton>
+                            <UIButton Show="this.DisplayExit" ClickEvent="this.TryExit" ColourCode="Bootstrap.ColourCode.nav">Exit</UIButton>
                         </UIButtonColumn>
                     </UIRow>
                 </UIContainer>
-            </AlwaysDisplayContent>
-        </UIErrorHandler>
+            </ButtonContent>
+        </ModalEditForm>
     </Body>
 </UICard>
 ```

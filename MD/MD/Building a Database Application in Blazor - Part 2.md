@@ -10,13 +10,12 @@ This article is the second in a series on Building Blazor Projects: it describes
 6. [A walk through detailing how to add weather stations and weather station data to the application](https://www.codeproject.com/Articles/5281000/Building-a-Database-Application-in-Blazor-Part-6-A)
 
 ## Repository and Database
-The repository for the articles has move to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
+
+The repository for the articles has moved to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
 
 There's a SQL script in /SQL in the repository for building the database.
 
-[You can see the Server version of the project running here](https://cec-blazor-server.azurewebsites.net/).
-
-[You can see the WASM version of the project running here](https://cec-blazor-wasm.azurewebsites.net/).
+[You can see the Server and WASM versions of the project running here on the same site](https://cec-blazor-server.azurewebsites.net/).
 
 ## Services
 

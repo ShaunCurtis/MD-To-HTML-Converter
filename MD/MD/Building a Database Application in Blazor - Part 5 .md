@@ -20,13 +20,13 @@ This article looks in detail at building reusable List Presentation Layer compon
 
 ## Repository and Database
 
-[CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor)
+The repository for the articles has move to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
 
 There's a SQL script in /SQL in the repository for building the database.
 
-[You can see the Server version of the project running here](https://cec-blazor-server.azurewebsites.net/).
+[You can see the Server and WASM versions of the project running here on the same site](https://cec-blazor-server.azurewebsites.net/).
 
-[You can see the WASM version of the project running here](https://cec-blazor-wasm.azurewebsites.net/).
+Serveral classes described here are part of the separate *CEC.Blazor.Core* library.  The Github is [here](https://github.com/ShaunCurtis/CEC.Blazor.Core), and is available as a Nuget Package.
 
 ## List Functionality
 

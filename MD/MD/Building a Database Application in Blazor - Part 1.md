@@ -29,13 +29,14 @@ This first section describes my somewhat radical development approach and walks 
 
 ## Repository and Database
 
-The repository for the articles has move to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
+The repository for the articles has moved to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
 
 There's a SQL script in /SQL in the repository for building the database.
 
-[You can see the Server version of the project running here](https://cec-blazor-server.azurewebsites.net/).
+The Server and WASM versions of the site have been combined into a single site.  You can switch between the two in the left hand menu.  The site starts in Server mode - [https://cec-blazor-server.azurewebsites.net/](https://cec-blazor-server.azurewebsites.net/).
 
-[You can see the WASM version of the project running here](https://cec-blazor-wasm.azurewebsites.net/).
+Serveral classes described here are part of the separate *CEC.Blazor.Core* library.  The Github is [here](https://github.com/ShaunCurtis/CEC.Blazor.Core), and is available as a Nuget Package.
+
 
 ## Solution Structure
 
@@ -55,7 +56,7 @@ The data side of the project is structured fairly conventionally, loosely based 
 
 The UI is more radical:
 
-1. A custom `Component` class is used as the base UI component - `ControlBase` is only used by the out-of-the-box data controls.
+1. A custom `Component` class is used as the base UI component - `ComponentBase` is only used by the out-of-the-box data controls.
 2. Routing is discarded.  There's a new `ViewManager` that manages the UI.
 
 ## UI Structure

@@ -16,143 +16,147 @@ This article looks at the components we use in the UI and then focuses on how to
 
 ## Repository and Database
 
-[CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor)
+The repository for the articles has move to [CEC.Blazor.SPA Repository](https://github.com/ShaunCurtis/CEC.Blazor.SPA).  [CEC.Blazor GitHub Repository](https://github.com/ShaunCurtis/CEC.Blazor) is obselete and will be removed.
 
 There's a SQL script in /SQL in the repository for building the database.
 
-[You can see the Server version of the project running here](https://cec-blazor-server.azurewebsites.net/).
+[You can see the Server and WASM versions of the project running here on the same site](https://cec-blazor-server.azurewebsites.net/).
 
-[You can see the WASM version of the project running here](https://cec-blazor-wasm.azurewebsites.net/).
+Serveral classes described here are part of the separate *CEC.Blazor.Core* library.  The Github is [here](https://github.com/ShaunCurtis/CEC.Blazor.Core), and is available as a Nuget Package.
 
 ### Components
 
 For a detailed look at components read my article [A Dive into Blazor Components](https://www.codeproject.com/Articles/5277618/A-Dive-into-Blazor-Components).
 
-Everything in the Blazor UI, other than the start page, is a component.  Yes App, Router,...
+Everything in the Blazor UI, other than the start page, is a component.  Yes App, Router,... they are all components.
 
-There are 4 categories of component in the application:
-1. Views - these are get displayed on screen.  Views are combined with a Layout to make the display window.
+You can divide components into four categories:
+1. Views - these are the top level components.  Views are combined with a Layout to make the display window.
 2. Layouts - Layouts combine with Views to make up the display window.
 3. Forms - Forms are logical collections of controls.  Edit forms, display forms, list forms, data entry wizards are all classic forms.  Forms contain controls - not HTML.
 4. Controls - Controls display something - the emit HTML.  Text boxes, dropdowns, buttons, grids are all classic controls.
 
 ### Views
 
-Views are specific to the application, but are common to WASM and Server, so live in */Components/Views* of the application library.
+Views are specific to the application, but are common across WASM and Server projects, so live in */Components/Views*  in the *Weather* library.
 
 The Weather Forecast Viewer and List Views are shown below.
 ```cs
-// CEC.Weather/Components/Views/WeatherForecastViewerView.cs
+// CEC.Weather/Components/Views/WeatherForecast/WeatherForecastViewerView.cs
 @using CEC.Blazor.Components
 @using CEC.Weather.Components
 @using CEC.Blazor.Components.Base
 
 @namespace CEC.Weather.Components.Views
 @implements IView
-@inherits Component
+@inherits ViewBase
 
 <WeatherForecastViewerForm ID="this.ID"></WeatherForecastViewerForm>
 
 @code {
-
-    [CascadingParameter] public ViewManager ViewManager { get; set; }
-
     [Parameter] public int ID { get; set; } = 0;
 }
 ```
+
 The list view defines a UIOptions object that control various list control display options.
+
 ```cs
-// CEC.Blazor.Server/Routes/WeatherForecastListView.cs
-@using CEC.Blazor.Components
-@using CEC.Blazor.Components.UIControls
+// CEC.Blazor.Server/Routes/WeatherForecast/WeatherForecastListView.cs
+@using CEC.Blazor.SPA.Components
+@using CEC.Blazor.SPA.Components.UIControls
 @using CEC.Weather.Components
-@using CEC.Blazor.Components.Base
 
 @namespace CEC.Weather.Components.Views
 @inherits Component
 @implements IView
 
-<WeatherForecastListForm UIOptions="this.UIOptions"></WeatherForecastListForm>
+<WeatherForecastListForm Properties="this.UIProperties"></WeatherForecastListForm>
 
 @code {
-    [CascadingParameter]
-    public ViewManager ViewManager { get; set; }
+        [CascadingParameter]
+        public ViewManager ViewManager { get; set; }
 
-    public UIOptions UIOptions => new UIOptions()
+    public PropertyCollection UIProperties
     {
-        ListNavigationToViewer = true,
-        ShowButtons = true,
-        ShowAdd = true,
-        ShowEdit = true
-    };
+        get
+        {
+            var props = new PropertyCollection();
+            {
+                props.Add(PropertyConstants.RowNavigateToViewer, true);
+                props.Add(PropertyConstants.ShowButtons, true);
+                props.Add(PropertyConstants.ShowEdit, true);
+                props.Add(PropertyConstants.ShowAdd, true);
+                props.Add(PropertyConstants.UseModalViewer, true);
+            }
+            return props;
+        }
+    }
 }
 ```
 
 ### Forms
 
-Forms are specific to the application, but are common to WASM and Server, so live in */Components/Views* of the application library.
+Forms are specific to the application, but are common across WASM and Server projects, so live in */Components/Forms*  in the *Weather* library.
 
 The code below shows the Weather Viewer.  It's all UI Controls, no HTML markup.
 
 ```html
 // CEC.Weather/Components/Forms/WeatherForecastViewerForm.razor
+@namespace CEC.Weather.Components
+@using CEC.Blazor.SPA.Components.Forms
+@using CEC.Blazor.SPA.Components.UIControls
+@using CEC.Weather.Data
+@using CEC.Blazor.Extensions
+
+@inherits RecordFormBase<DbWeatherForecast, WeatherForecastDbContext>
+
 <UICard>
     <Header>
         @this.PageTitle
     </Header>
     <Body>
-        <UIErrorHandler IsError="this.IsError" IsLoading="this.IsDataLoading" ErrorMessage="@this.RecordErrorMessage">
+        <UIErrorHandler IsError="this.IsError" IsLoading="this.Loading" ErrorMessage="@this.RecordErrorMessage">
             <UIContainer>
-                <UIRow>
+                <UIFormRow>
                     <UILabelColumn Columns="2">
                         Date
                     </UILabelColumn>
                     <UIColumn Columns="2">
-                        <FormControlPlainText Value="@this.Service.Record.Date.AsShortDate()"></FormControlPlainText>
+                        <InputReadOnlyText Value="@this.Service.Record.Date.AsShortDate()"></InputReadOnlyText>
                     </UIColumn>
                     <UILabelColumn Columns="2">
                         ID
                     </UILabelColumn>
                     <UIColumn Columns="2">
-                        <FormControlPlainText Value="@this.Service.Record.ID.ToString()"></FormControlPlainText>
+                        <InputReadOnlyText Value="@this.Service.Record.ID.ToString()"></InputReadOnlyText>
                     </UIColumn>
                     <UILabelColumn Columns="2">
                         Frost
                     </UILabelColumn>
                     <UIColumn Columns="2">
-                        <FormControlPlainText Value="@this.Service.Record.Frost.AsYesNo()"></FormControlPlainText>
+                        <InputReadOnlyText Value="@this.Service.Record.Frost.AsYesNo()"></InputReadOnlyText>
                     </UIColumn>
-                </UIRow>
-            ..........
+                </UIFormRow>
             </UIContainer>
+            ..........
         </UIErrorHandler>
+
         <UIContainer>
             <UIRow>
                 <UIColumn Columns="6">
-                    <UIButton Show="this.IsLoaded" ColourCode="Bootstrap.ColourCode.dark" ClickEvent="(e => this.NextRecord(-1))">
-                        Previous
-                    </UIButton>
-                    <UIButton Show="this.IsLoaded" ColourCode="Bootstrap.ColourCode.dark" ClickEvent="(e => this.NextRecord(1))">
-                        Next
-                    </UIButton>
                 </UIColumn>
                 <UIButtonColumn Columns="6">
-                    <UIButton Show="!this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e => this.NavigateTo(PageExitType.ExitToList))">
-                        Exit To List
-                    </UIButton>
-                    <UIButton Show="!this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e => this.NavigateTo(PageExitType.ExitToLast))">
-                        Exit
-                    </UIButton>
-                    <UIButton Show="this.IsModal" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e => this.ModalExit())">
+                    <UIButton Show="true" ColourCode="Bootstrap.ColourCode.nav" ClickEvent="(e => this.Exit())">
                         Exit
                     </UIButton>
                 </UIButtonColumn>
             </UIRow>
         </UIContainer>
     </Body>
+</UICard>
 ```
 
-The code behind page is relatively simple - the complexity is in the boilerplate code in parent classes.  It loads the record specific Controller service.
+The code behind page is relatively simple - the complexity is in the boilerplate code in the parent classes.  It loads the record specific Controller service.
 
 ```cs
 // CEC.Weather/Components/Forms/WeatherForecastViewerForm.razor.cs
@@ -173,11 +177,11 @@ The code behind page is relatively simple - the complexity is in the boilerplate
 
 ## UI Controls
 
-UI Controls emit HTML and CSS markup based on Bootstrap as the UI CSS Framework.  All controls inherit from `ControlBase` and UI Controls inherit from `UIBase`.
+UI Controls emit HTML and CSS markup based on Bootstrap as the UI CSS Framework.  All controls inherit from `Component` and UI Controls inherit from `UIBase`.
 
 ##### UIBase
 
-`UIBase` inherits from `ControlBase` which inherits from `Component`.  It builds an HTML DIV block that you can turn on or off.
+`UIBase` inherits from `Component`.  It builds an HTML DIV block that you can turn on or off.
 
 Lets look at some of the bits of `UIBase` in detail.
 
@@ -331,6 +335,9 @@ public class UIButton : UIBootstrapBase
     [Parameter]
     public string ButtonType { get; set; } = "button";
 
+    /// Property to control disabled atrribute
+    [Parameter] public bool Disabled { get; set; }
+
     /// Override the CssName
     protected override string CssName => "btn";
 
@@ -348,8 +355,9 @@ public class UIButton : UIBootstrapBase
             builder.OpenElement(0, this._Tag);
             builder.AddAttribute(1, "type", this.ButtonType);
             builder.AddAttribute(2, "class", this._Css);
-            builder.AddAttribute(3, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, this.ButtonClick));
-            builder.AddContent(4, ChildContent);
+            if (this.Disabled) builder.AddAttribute(3, "disabled");
+            builder.AddAttribute(4, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, this.ButtonClick));
+            builder.AddContent(5, ChildContent);
             builder.CloseElement();
         }
     }
@@ -438,13 +446,24 @@ public class UIErrorHandler : UIBase
     /// Enum for the Control State
     public enum ControlState { Error = 0, Loading = 1, Loaded = 2}
 
-    /// Boolean Property that determines if the child content or an error message is diplayed
+    /// Boolean Property that determines if the child content or an error message is diSplayed
     [Parameter]
     public bool IsError { get; set; } = false;
 
-    /// Boolean Property that determines if the child content or an loading message is diplayed
+    /// Boolean Property that determines if the child content or an loading message is diSplayed
     [Parameter]
     public bool IsLoading { get; set; } = true;
+
+    /// Boolean Property that determines if the child content or an Access Denied message is diSplayed
+    [Parameter]
+    public bool AccessDenied { get; set; } = false;
+
+
+    /// Render Fragments to contain the various type of content to display
+    [Parameter] public RenderFragment LoadingContent { get; set; }
+    [Parameter] public RenderFragment ErrorContent { get; set; }
+    [Parameter] public RenderFragment AccessDeniedContent { get; set; }
+    [Parameter] public RenderFragment AlwaysDisplayContent { get; set; }
 
     /// Control State
     public ControlState State
@@ -452,7 +471,8 @@ public class UIErrorHandler : UIBase
         get
         {
             if (IsError && !IsLoading) return ControlState.Error;
-            else if (!IsLoading) return ControlState.Loaded;
+            else if ((!IsLoading) && !AccessDenied) return ControlState.Loaded;
+            else if (AccessDenied) return ControlState.AccessDenied;
             else return ControlState.Loading;
         }
     }
@@ -471,33 +491,54 @@ public class UIErrorHandler : UIBase
         switch (this.State)
         {
             case ControlState.Loading:
-                builder.OpenElement(1, "div");
-                builder.AddAttribute(2, "class", this._Css);
-                builder.OpenElement(3, "button");
-                builder.AddAttribute(4, "class", "btn btn-primary");
-                builder.AddAttribute(5, "type", "button");
-                builder.AddAttribute(6, "disabled", "disabled");
-                builder.OpenElement(7, "span");
-                builder.AddAttribute(8, "class", "spinner-border spinner-border-sm pr-2");
-                builder.AddAttribute(9, "role", "status");
-                builder.AddAttribute(10, "aria-hidden", "true");
-                builder.CloseElement();
-                builder.AddContent(11, "  Loading...");
-                builder.CloseElement();
-                builder.CloseElement();
+                if (this.LoadingContent != null) builder.AddContent(1, this.LoadingContent);
+                else
+                {
+                    builder.OpenElement(2, "div");
+                    builder.AddAttribute(3, "class", this._Css);
+                    builder.OpenElement(4, "button");
+                    builder.AddAttribute(5, "class", "btn btn-primary");
+                    builder.AddAttribute(6, "type", "button");
+                    builder.AddAttribute(7, "disabled", "disabled");
+                    builder.OpenElement(8, "span");
+                    builder.AddAttribute(9, "class", "spinner-border spinner-border-sm pr-2");
+                    builder.AddAttribute(10, "role", "status");
+                    builder.AddAttribute(11, "aria-hidden", "true");
+                    builder.CloseElement();
+                    builder.AddContent(12, "  Loading...");
+                    builder.CloseElement();
+                    builder.CloseElement();
+                }
                 break;
             case ControlState.Error:
-                builder.OpenElement(1, "div");
-                builder.OpenElement(2, "span");
-                builder.AddAttribute(3, "class", this._Css);
-                builder.AddContent(4, ErrorMessage);
-                builder.CloseElement();
-                builder.CloseElement();
+                if (this.ErrorContent != null) builder.AddContent(100, this.ErrorContent);
+                else
+                {
+                    builder.OpenElement(101, "div");
+                    builder.OpenElement(102, "span");
+                    builder.AddAttribute(103, "class", this._Css);
+                    builder.AddContent(104, ErrorMessage);
+                    builder.CloseElement();
+                    builder.CloseElement();
+                }
+                break;
+            case ControlState.AccessDenied:
+                if (this.AccessDeniedContent != null) builder.AddContent(200, this.AccessDeniedContent);
+                else
+                {
+                    builder.OpenElement(201, "div");
+                    builder.OpenElement(202, "span");
+                    builder.AddAttribute(203, "class", this._Css);
+                    builder.AddContent(304, "You currently don't have permissions to access this record");
+                    builder.CloseElement();
+                    builder.CloseElement();
+                }
                 break;
             default:
-                builder.AddContent(1, ChildContent);
+                builder.AddContent(401, ChildContent);
                 break;
         };
+        if (this.AlwaysDisplayContent != null) builder.AddContent(200, this.AlwaysDisplayContent);
     }
 }
 ```
@@ -512,9 +553,11 @@ Here's some code showing the control in use.
     </Header>
     <Body>
         <UIErrorHandler IsError="this.IsError" IsLoading="this.IsDataLoading" ErrorMessage="@this.RecordErrorMessage">
-            <UIContainer>
-            ..........
-            </UIContainer>
+            <ChildContent>
+                <UIContainer>
+                ..........
+                </UIContainer>
+            </ChildContent>
         </UIErrorHandler>
         .......
     </Body>
@@ -590,3 +633,5 @@ Some key points to note:
 
 * 21-Sep-2020: Initial version.
 * 17-Nov-2020: Major Blazor.CEC library changes.  Change to ViewManager from Router and new Component base implementation.
+* 7-Feb-2021: Major updates to Services, project structure and data editing.
+
